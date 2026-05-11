@@ -80,10 +80,7 @@ def _slugify(value: str) -> str:
 def _wiki_slug(output_text: str, source: str, wiki_sub: Path) -> tuple[str, str]:
     title = _extract_title(output_text, source)
     slug = _slugify(title)
-    wiki_path = wiki_sub / f"{slug}.md"
-
-    if wiki_path.exists():
-        slug = f"{slug}-{hash_source(source)[:4]}"
+    slug = f"{slug}-{hash_source(source)[:4]}"
     return title, slug
 
 

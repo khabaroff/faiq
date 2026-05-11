@@ -74,6 +74,21 @@ def _bool_str(val: bool) -> str:
     return "true" if val else "false"
 
 
+def _default_provenance(source_type: str) -> tuple[float, float, float]:
+    mapping = {
+        "article": (0.90, 0.08, 0.02),
+        "reference": (0.80, 0.15, 0.05),
+        "youtube": (0.60, 0.30, 0.10),
+        "youtube_video": (0.60, 0.30, 0.10),
+        "github_repo": (0.85, 0.10, 0.05),
+        "pdf": (0.50, 0.35, 0.15),
+        "file": (0.75, 0.20, 0.05),
+        "note": (0.80, 0.15, 0.05),
+        "telegram": (0.40, 0.40, 0.20),
+    }
+    return mapping.get(source_type.lower(), (0.70, 0.20, 0.10))
+
+
 def wrap_with_frontmatter(
     body: str,
     source_type: str,
@@ -156,7 +171,9 @@ def wrap_with_frontmatter(
             lines.append(f"{key}: []")
 
     qs_str = f"{quality_score:.2f}" if quality_score is not None else "null"
-    lines.extend(["related: []", f"review_required: {_bool_str(review_required)}", f"verified: {_bool_str(verified)}", f"quality_score: {qs_str}", "provenance:", "  extracted: 0", "  inferred: 0", "  ambiguous: 0"])
+
+    prov_extracted, prov_inferred, prov_ambiguous = _default_provenance(st_lower)
+    lines.extend(["related: []", f"review_required: {_bool_str(review_required)}", f"verified: {_bool_str(verified)}", f"quality_score: {qs_str}", "provenance:", f"  extracted: {prov_extracted}", f"  inferred: {prov_inferred}", f"  ambiguous: {prov_ambiguous}"])
 
     if source_path:
         lines.append(f'source_paths:\n  - "{_quote(source_path)}"')
