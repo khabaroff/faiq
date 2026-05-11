@@ -159,4 +159,7 @@ def store(
     wiki_path.write_text(output_text, encoding="utf-8")
     _append_wiki_log(wiki_dir, title, source_subfolder, slug)
 
+    from guides.enrich.indexes import rebuild_indexes
+    rebuild_indexes(wiki_dir)
+
     return wiki_path
