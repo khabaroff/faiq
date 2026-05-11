@@ -10,6 +10,7 @@ from guides.settings import Settings
 
 logger = logging.getLogger(__name__)
 
+_TEXT_EXTENSIONS = {".md", ".txt", ".pdf", ".rst", ".markdown", ".org", ""}
 _URL_RE = re.compile(r"https?://\S+")
 
 
