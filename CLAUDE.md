@@ -23,89 +23,84 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-[To be filled: Brief description of what this project does]
+Pure spec repository — no application code. Uses OpenSpec for spec-driven development. Fill in `openspec/project.md` with project-specific context.
 
-## OpenSpec Workflow
-
-This project uses OpenSpec for spec-driven development. Always check `@/openspec/AGENTS.md` when working with proposals, specs, or planning changes.
-
-### Key Commands
-
-```bash
-# View active changes and specs
-openspec list                  # List active change proposals
-openspec list --specs          # List all specifications
-openspec show [item]           # View change or spec details
-
-# Create and validate proposals
-openspec validate [change] --strict --no-interactive  # Validate changes
-openspec archive <change-id> --yes  # Archive completed change
-
-# Project context
-# Edit openspec/project.md to add project-specific context
-```
-
-### When to Create Proposals
-
-Create OpenSpec change proposal for:
-
-- New features or capabilities
-- Breaking changes (API, schema, architecture)
-- Performance/security work that changes behavior
-
-Skip proposals for:
-
-- Bug fixes (restoring intended behavior)
-- Typos, formatting, comments
-- Dependency updates (non-breaking)
-
-See `openspec/AGENTS.md` for complete workflow details.
-
-## Development Commands
-
-### Setup
+## Setup
 
 ```bash
 npm install -g @fission-ai/openspec@latest
-# [Add additional installation/setup commands here]
 ```
 
-### Build & Run
+## Key Commands
 
 ```bash
-# [Add build commands]
-# [Add run/start commands]
+openspec list                                         # Active change proposals
+openspec list --specs                                 # All specifications
+openspec show [item]                                  # Change or spec details
+openspec show [change] --json --deltas-only           # Debug delta parsing
+openspec validate [change] --strict --no-interactive  # Validate before sharing
+openspec archive <change-id> --yes                    # Archive after deployment
+rg -n "Requirement:|Scenario:" openspec/specs         # Full-text search
 ```
 
-### Testing
+## Three-Stage Workflow
 
-```bash
-# [Add test commands]
-# [Add single test run command if applicable]
+**Stage 1 — Propose:** Scaffold `openspec/changes/<id>/` with `proposal.md`, `tasks.md`, and delta specs under `specs/<capability>/spec.md`. Run validate. Wait for approval before Stage 2.
+
+**Stage 2 — Implement:** Follow `tasks.md` sequentially. Mark all items `[x]` only after everything is done.
+
+**Stage 3 — Archive:** `openspec archive <change-id> --yes`, then validate to confirm.
+
+## Directory Structure
+
+```
+openspec/
+├── project.md          # Project conventions — read this first
+├── specs/              # Truth: what IS built (capability/spec.md)
+├── changes/            # Proposals: what SHOULD change
+│   ├── <change-id>/
+│   │   ├── proposal.md
+│   │   ├── tasks.md
+│   │   ├── design.md   # Optional; only for cross-cutting/complex changes
+│   │   └── specs/<capability>/spec.md  # Deltas: ADDED/MODIFIED/REMOVED
+│   └── archive/        # Completed changes
 ```
 
-### Linting & Formatting
+## Spec Format Rules
 
-```bash
-# [Add linting commands]
-# [Add formatting commands]
-```
+- Scenarios: `#### Scenario: Name` (4 hashtags — not bullets, bold, or 3 hashtags)
+- Every requirement needs at least one scenario
+- Requirements use SHALL/MUST (not should/may)
+- MODIFIED deltas must include full requirement text (archiver replaces entire block)
+- Change IDs: kebab-case, verb-led (`add-`, `update-`, `remove-`, `refactor-`)
 
-## Architecture
+## Skip Proposals For
 
-[To be filled: High-level architecture overview that requires understanding multiple files]
+Bug fixes restoring intended behavior, typos/formatting, non-breaking dependency updates, config changes, tests for existing behavior.
 
-### Key Patterns
+## Model Delegation
 
-[To be filled: Important architectural patterns, design decisions, or conventions used in this codebase]
+Принцип: Opus = мозг, делегируй всё что не требует стратегического мышления. Не спрашивай — делегируй сразу.
 
-### Directory Structure
+**→ Haiku** (`Agent(subagent_type="Explore", model="haiku")`):
+- Поиск по репо больше 1 файла, grep по содержимому, обход структуры
+- Проверка "существует ли X", "найди все упоминания Y"
 
-[To be filled: Only non-obvious structural decisions that affect how code should be organized]
+**→ Sonnet** (`Agent(subagent_type="general-purpose", model="sonnet")`):
+- Правка/написание текста > 50 строк
+- Параллельные независимые подзадачи (несколько Sonnet-агентов сразу)
 
-## Important Notes
+**Opus сам:**
+- Архитектура, стратегия, оценка качества, выбор между вариантами
+- Короткие задачи < 30 сек — делегация дороже выполнения
 
-[To be filled: Project-specific context that would be difficult to discover by reading individual files]
+**Subagent fallback:** если субагент не может писать файлы из-за прав — главный агент завершает запись сам.
+
+**Пометки в ответах:** `[Haiku] ищу X...` / `[Sonnet] правлю Y...`
+
+## Context Management
+
+Sonnet 4.6 — 200K (autocompact на ~80%). При деградации (путаница имён, повторение обсуждённого) — сообщай сразу. Для многошаговых задач: после каждой фазы — короткий summary.
 
 
 <!-- BEGIN BEADS INTEGRATION v:1 profile:minimal hash:7510c1e2 -->

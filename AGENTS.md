@@ -104,3 +104,53 @@ bd close <id>         # Complete work
 - NEVER say "ready to push when you are" - YOU must push
 - If push fails, resolve and retry until it succeeds
 <!-- END BEADS INTEGRATION -->
+
+
+<claude-mem-context>
+# Memory Context
+
+# [guides] recent context, 2026-05-11 10:58am GMT+4
+
+Legend: 🎯session 🔴bugfix 🟣feature 🔄refactor ✅change 🔵discovery ⚖️decision 🚨security_alert 🔐security_note
+Format: ID TIME TYPE TITLE
+Fetch details: get_observations([IDs]) | Search: mem-search skill
+
+Stats: 24 obs (12,751t read) | 215,185t work | 94% savings
+
+### May 11, 2026
+S328 Init: Explore GOO_LIBARCH/guides project structure, understand OpenSpec workflow, update CLAUDE.md with production guidance (May 11 at 10:06 AM)
+S327 Initialize guides project by exploring directory structure and creating project configuration (May 11 at 10:06 AM)
+732 10:07a 🔵 Project uses Beads (bd) for issue tracking with mandatory git push workflow
+733 10:08a ✅ Updated CLAUDE.md with filled-in OpenSpec workflow and project structure
+S329 User examined 5 reference repositories as context: usiki (Mnemon Knowledge Vault), usiki-docs (Russian knowledge vault), khabaroff-writer (Telegram bot), LAAI (knowledge system research), LAAI-refrepos (30+ reference projects). Goal: establish reference architecture and scope boundaries before active work. (May 11 at 10:08 AM)
+734 10:13a 🔵 User's Multi-Repository Knowledge System Architecture
+736 " ✅ Added Model Delegation and Context Management sections to guides CLAUDE.md
+735 10:14a 🔵 LAAI PRD Documentation Structure and Operational Model
+S330 Init: Establish OpenSpec workflow, project structure, and AI delegation patterns in guides project CLAUDE.md (May 11 at 10:14 AM)
+S333 Review comprehensive architecture plan for guides/ — technical content pipeline project. User requested full plan examination and commentary. (May 11 at 10:15 AM)
+737 10:17a 🔵 guides/task.md: Content Pipeline for Technical Learning Materials
+738 " 🔵 usiki Mnemon Vault: Live Extract Example (YouTube Interview Transcription)
+739 " 🔵 khabaroff-writer Deployment Architecture: Multi-Tier LLM Routing with Fallbacks
+740 " 🔵 LAAI-refrepos Reference Inventory: 33 Knowledge System Implementations
+741 10:18a ⚖️ Simple Cron-Based Content Pipeline Scope for task.md
+742 10:24a ⚖️ guides/ Pipeline Architecture: Sequential Processing with Queue-Based Streams
+743 10:28a ⚖️ guides/ content pipeline architecture — multi-stage async design
+S334 Document and export guides/ pipeline architecture plan to project docs. User requested full plan be written to file and open for feedback. (May 11 at 10:29 AM)
+S335 MVP Product Director analysis: Review guides pipeline plan and identify what to build vs. cut without over-engineering (May 11 at 10:30 AM)
+745 10:41a ⚖️ Pipeline v1 Scope Reduction: Defer Complex Features
+744 " ⚖️ MVP Scope: Cut 5 features, collapse streams, simplify structure
+S336 Locate SENIOR and JUNIOR surfaces in cmux workspaces (May 11 at 10:43 AM)
+746 10:50a ⚖️ MVP scope refined: explicit cuts from original pipeline plan
+747 " ⚖️ Three unresolved architecture questions documented for MVP implementation
+748 10:52a ✅ Pipeline plan refined and saved as v2: clean MVP architecture with 7 stages and 3 source types
+750 10:54a ✅ Implementation plan created: 11 tasks from skeleton to VPS smoke test
+749 10:55a 🔵 Located SENIOR and JUNIOR surfaces in cmux workspace
+S337 Evaluate task management approaches for SENIOR and JUNIOR agent dispatch (May 11 at 10:56 AM)
+751 10:57a 🔵 Beads (bd) task management tool is installed and available
+752 " 🔵 SENIOR and JUNIOR are Claude agents with Azure Foundry MCP backends
+753 " 🔵 Beads (bd) workflow conventions established for guides project
+754 " 🔵 guides project MVP specification: content ingestion pipeline
+755 " 🔵 Guides MVP implementation plan: 11 sequential tasks with verification
+
+Access 215k tokens of past work via get_observations([IDs]) or mem-search skill.
+</claude-mem-context>
