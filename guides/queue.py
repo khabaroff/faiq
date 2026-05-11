@@ -33,20 +33,28 @@ def already_processed(source: str, sources_dir: Path) -> bool:
     return False
 
 
-def _extract_urls(text: str) -> list[str]:
+_STANDALONE_URL_RE = re.compile(r"^[\s\-*>]*https?://\S+")
+
+
+def _extract_urls(text: str, standalone_only: bool = False) -> list[str]:
     urls: list[str] = []
     seen: set[str] = set()
-    for match in _URL_RE.findall(text):
-        url = match
-        while url and url[-1] in ")].,;:!?'\"":
-            if url[-1] == ")" and url.count("(") >= url.count(")"):
-                break
-            url = url[:-1]
+    lines = text.splitlines() if standalone_only else [text]
 
-        if not url or url in seen:
+    for line in lines:
+        if standalone_only and not _STANDALONE_URL_RE.match(line):
             continue
-        seen.add(url)
-        urls.append(url)
+        search_text = line if standalone_only else text
+        for match in _URL_RE.findall(search_text):
+            url = match
+            while url and url[-1] in ")].,;:!?'\"":
+                if url[-1] == ")" and url.count("(") >= url.count(")"):
+                    break
+                url = url[:-1]
+            if not url or url in seen:
+                continue
+            seen.add(url)
+            urls.append(url)
     return urls
 
 
@@ -167,8 +175,8 @@ def scan_inbox(inbox_dir: Path) -> list[QueueItem]:
                         )
                     continue
 
-                if classification == "mixed" and urls:
-                    for url in urls:
+                if classification == "mixed":
+                    for url in _extract_urls(content, standalone_only=True):
                         if already_processed(url, settings.data_dir / "sources"):
                             continue
                         items.append(
