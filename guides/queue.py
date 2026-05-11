@@ -25,7 +25,7 @@ def _is_valid_line(stripped: str) -> bool:
     return full.exists()
 
 
-def _already_processed(source: str, sources_dir: Path) -> bool:
+def already_processed(source: str, sources_dir: Path) -> bool:
     hash8 = hashlib.sha256(source.encode()).hexdigest()[:8]
     for entry in sources_dir.iterdir():
         if entry.is_dir() and hash8 in entry.name:
@@ -136,7 +136,7 @@ def scan_inbox(inbox_dir: Path) -> list[QueueItem]:
                 continue
 
             source = str(f)
-            if _already_processed(source, settings.data_dir / "sources"):
+            if already_processed(source, settings.data_dir / "sources"):
                 continue
 
             if ext in {".txt", ".md", ""}:
@@ -145,13 +145,18 @@ def scan_inbox(inbox_dir: Path) -> list[QueueItem]:
                 urls = _extract_urls(content)
 
                 if classification == "single_url" and urls:
+                    url = urls[0]
+                    if already_processed(url, settings.data_dir / "sources"):
+                        continue
                     items.append(
-                        QueueItem(source=urls[0], source_kind=SourceKind.URL, received_at=datetime.now(), origin="inbox")
+                        QueueItem(source=url, source_kind=SourceKind.URL, received_at=datetime.now(), origin="inbox")
                     )
                     continue
 
                 if classification == "url_list" and urls:
                     for url in urls:
+                        if already_processed(url, settings.data_dir / "sources"):
+                            continue
                         items.append(
                             QueueItem(source=url, source_kind=SourceKind.URL, received_at=datetime.now(), origin="inbox")
                         )

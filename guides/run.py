@@ -67,11 +67,7 @@ def run_pipeline(item: QueueItem) -> dict:
             source_path = item.source if is_file else ""
 
             body = strip_frontmatter(output_text)
-            status, checks = run_verify(fetched.raw_text, body, taxonomy["tags"], source_type=wiki_source_type)
-            verify_status = "verified" if status == "verified" else "needs-review"
-
-            output_text = wrap_with_frontmatter(
-                body,
+            wrap_kwargs = dict(
                 source_type=wiki_source_type,
                 source_url=source_url,
                 tags=taxonomy["tags"],
@@ -79,8 +75,12 @@ def run_pipeline(item: QueueItem) -> dict:
                 entities=taxonomy["entities"],
                 concepts=taxonomy["concepts"],
                 source_path=source_path,
-                status=verify_status,
             )
+            output_text = wrap_with_frontmatter(body, **wrap_kwargs)
+
+            status, checks = run_verify(fetched.raw_text, output_text, taxonomy["tags"], source_type=wiki_source_type)
+            if status == "verified":
+                output_text = wrap_with_frontmatter(body, **wrap_kwargs, status="verified")
 
             vault_path = store(
                 item.source,
