@@ -1,70 +1,59 @@
-import glob
 import re
 import subprocess
 import tempfile
+from pathlib import Path
 
 import httpx
 
-from .base import FetchedContent, QueueItem, SourceType
+from guides.fetch.base import FetchedContent, QueueItem, SourceType
 
 
 def fetch_youtube(item: QueueItem) -> FetchedContent:
     url = item.source
-    source_meta: dict[str, object] = {}
-    text = ""
+    transcript = _try_ytdlp(url) or _try_transcribe_service(url)
 
+    meta: dict = {"url": url}
+    if not transcript:
+        meta["error"] = "no_transcript"
+        transcript = ""
+
+    return FetchedContent(raw_text=transcript, source_type=SourceType.YOUTUBE, source_meta=meta)
+
+
+def _try_ytdlp(url: str) -> str | None:
     try:
         with tempfile.TemporaryDirectory() as tmpdir:
             result = subprocess.run(
-                [
-                    "yt-dlp",
-                    "--write-auto-sub",
-                    "--sub-lang", "ru,en",
-                    "--skip-download",
-                    "--output", f"{tmpdir}/%(id)s",
-                    url,
-                ],
-                capture_output=True,
-                text=True,
-                timeout=120,
+                ["yt-dlp", "--write-auto-sub", "--sub-lang", "ru,en", "--skip-download", "--output", f"{tmpdir}/yt", url],
+                capture_output=True, text=True, timeout=120,
             )
-            if result.returncode != 0:
-                source_meta["error"] = f"yt-dlp failed: {result.stderr.strip()}"
-                return FetchedContent(raw_text="", source_type=SourceType.YOUTUBE, source_meta=source_meta)
-
-            vtt_files = glob.glob(f"{tmpdir}/*.vtt")
-            if vtt_files:
-                vtt = vtt_files[0]
-                raw = vtt.read_text(encoding="utf-8")
-                text = _parse_vtt(raw)
-
-    except Exception as e:
-        source_meta["fallback_attempted"] = True
-
-    if not text.strip():
-        try:
-            resp = httpx.get(f"https://youtubetranscribe.khabaroff.studio/transcript?url={url}", timeout=60)
-            if resp.status_code == 200:
-                text = resp.text
-        except Exception:
-            source_meta["error"] = "no_transcript"
-            return FetchedContent(raw_text="", source_type=SourceType.YOUTUBE, source_meta=source_meta)
-
-    if not text.strip():
-        source_meta["error"] = "no_transcript"
-        return FetchedContent(raw_text="", source_type=SourceType.YOUTUBE, source_meta=source_meta)
-
-    return FetchedContent(raw_text=text, source_type=SourceType.YOUTUBE, source_meta=source_meta)
+            vtt_files = list(Path(tmpdir).glob("*.vtt"))
+            if not vtt_files:
+                return None
+            raw = vtt_files[0].read_text(encoding="utf-8")
+            return _parse_vtt(raw)
+    except Exception:
+        return None
 
 
 def _parse_vtt(vtt: str) -> str:
-    lines = vtt.splitlines()
-    cleaned: list[str] = []
-    for line in lines:
-        if re.match(r"\d{2}:\d{2}:\d{2}\.\d{3}\s*-->\s*\d{2}:\d{2}:\d{2}\.\d{3}", line):
+    lines = []
+    seen: set[str] = set()
+    for line in vtt.splitlines():
+        if re.match(r"^\d{2}:\d{2}", line) or line.startswith("WEBVTT") or "-->" in line or not line.strip():
             continue
-        if line.strip() in ("", "WEBVTT", "Kind: captions", "Language: en", "Language: ru"):
-            continue
-        line = re.sub(r"<[^>]+>", "", line)
-        cleaned.append(line)
-    return "\n".join(cleaned).strip()
+        clean = re.sub(r"<[^>]+>", "", line).strip()
+        if clean and clean not in seen:
+            seen.add(clean)
+            lines.append(clean)
+    return " ".join(lines)
+
+
+def _try_transcribe_service(url: str) -> str | None:
+    try:
+        resp = httpx.get(f"https://youtubetranscribe.khabaroff.studio/?url={url}", timeout=120)
+        if resp.status_code == 200 and resp.text.strip():
+            return resp.text.strip()
+    except Exception:
+        pass
+    return None
