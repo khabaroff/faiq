@@ -36,6 +36,9 @@ class FetchedContent:
 def detect_source_type(item: QueueItem) -> SourceType:
     source = item.source.lower()
 
+    if "t.me/" in source or "telegram.me/" in source:
+        return SourceType.ARTICLE
+
     if "youtube.com" in source or "youtu.be" in source:
         return SourceType.YOUTUBE
 

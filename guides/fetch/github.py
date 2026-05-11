@@ -1,53 +1,70 @@
 import httpx
 
-from ..settings import Settings
-from .base import FetchedContent, QueueItem, SourceType
+from guides.settings import Settings
+
+from guides.fetch.base import FetchedContent, QueueItem, SourceType
 
 
-def fetch_github(item: QueueItem) -> FetchedContent:
-    url = item.source
-    parts = url.rstrip("/").split("/")
+def fetch_github_repo(item: QueueItem) -> FetchedContent:
+    url = item.source.rstrip("/")
+    parts = url.split("/")
     owner, repo = parts[-2], parts[-1]
-
-    settings = Settings()
-    headers: dict[str, str] = {}
-    if settings.github_token:
-        headers["Authorization"] = f"token {settings.github_token}"
-
-    source_meta: dict[str, object] = {}
-
+    
+    api_url = f"https://api.github.com/repos/{owner}/{repo}"
+    headers = _get_headers()
+    
     try:
-        repo_resp = httpx.get(f"https://api.github.com/repos/{owner}/{repo}", headers=headers, timeout=30)
-        if repo_resp.status_code == 200:
-            data = repo_resp.json()
-            source_meta = {
-                "name": data.get("full_name", ""),
-                "description": data.get("description", ""),
-                "stars": data.get("stargazers_count", 0),
-                "language": data.get("language", ""),
-            }
-        else:
-            source_meta["error"] = f"github_api_status:{repo_resp.status_code}"
+        resp = httpx.get(api_url, headers=headers, timeout=30)
+        resp.raise_for_status()
+        repo_data = resp.json()
     except Exception as e:
-        source_meta["error"] = str(e)
+        raise RuntimeError(f"Failed to fetch GitHub repo: {url}") from e
+    
+    readme_url = f"https://raw.githubusercontent.com/{owner}/{repo}/main/README.md"
+    readme_text = _try_fetch_readme(readme_url, headers)
+    
+    raw_text = _format_repo_text(repo_data, readme_text, url)
+    
+    return FetchedContent(
+        raw_text=raw_text,
+        source_type=SourceType.GITHUB_REPO,
+        source_meta={"url": url, "owner": owner, "repo": repo},
+    )
 
-    readme = ""
+
+def _get_headers() -> dict[str, str]:
+    headers = {"Accept": "application/vnd.github.v3+json"}
     try:
-        readme_resp = httpx.get(
-            f"https://raw.githubusercontent.com/{owner}/{repo}/HEAD/README.md",
-            headers=headers,
-            timeout=30,
-        )
-        if readme_resp.status_code == 200:
-            readme = readme_resp.text
+        token = Settings().github_token
+        if token:
+            headers["Authorization"] = f"token {token}"
     except Exception:
         pass
+    return headers
 
-    raw_text = f"# {source_meta.get('name', f'{owner}/{repo}')}\n\n"
-    if source_meta.get("description"):
-        raw_text += f"{source_meta['description']}\n\n"
-    raw_text += f"**Stars:** {source_meta.get('stars', '?')}  \n"
-    raw_text += f"**Language:** {source_meta.get('language', '?')}\n\n---\n\n"
-    raw_text += readme
 
-    return FetchedContent(raw_text=raw_text.strip(), source_type=SourceType.GITHUB_REPO, source_meta=source_meta)
+def _try_fetch_readme(url: str, headers: dict[str, str]) -> str:
+    try:
+        resp = httpx.get(url, headers=headers, timeout=30)
+        if resp.status_code == 200:
+            return resp.text
+    except Exception:
+        pass
+    return ""
+
+
+def _format_repo_text(repo_data: dict, readme: str, url: str) -> str:
+    lines = [
+        f"# {repo_data.get('name', 'Unknown')}",
+        "",
+        f"URL: {url}",
+        f"Description: {repo_data.get('description', 'N/A')}",
+        f"Stars: {repo_data.get('stargazers_count', 0)}",
+        f"Language: {repo_data.get('language', 'Unknown')}",
+        f"Topics: {', '.join(repo_data.get('topics', []))}",
+        "",
+        "## README",
+        "",
+        readme if readme else "_No README available_",
+    ]
+    return "\n".join(lines)
