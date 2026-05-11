@@ -1,4 +1,5 @@
 from functools import lru_cache
+
 from openai import AzureOpenAI
 
 from guides.settings import Settings
@@ -6,28 +7,33 @@ from guides.settings import Settings
 
 @lru_cache(maxsize=1)
 def get_smart_client() -> AzureOpenAI:
-    settings = Settings()
+    s = Settings()
     return AzureOpenAI(
-        api_key=settings.azure_openai_api_key,
-        azure_endpoint=settings.azure_openai_endpoint,
-        api_version=settings.azure_openai_api_version,
-        azure_deployment=settings.azure_deployment_smart,
+        api_key=s.azure_openai_api_key,
+        azure_endpoint=s.azure_openai_endpoint,
+        api_version=s.azure_openai_api_version,
     )
 
 
 @lru_cache(maxsize=1)
 def get_fast_client() -> AzureOpenAI:
-    settings = Settings()
-    deployment = settings.azure_deployment_fast or settings.azure_deployment_smart
+    s = Settings()
     return AzureOpenAI(
-        api_key=settings.azure_openai_api_key,
-        azure_endpoint=settings.azure_openai_endpoint,
-        api_version=settings.azure_openai_api_version,
-        azure_deployment=deployment,
+        api_key=s.azure_openai_api_key,
+        azure_endpoint=s.azure_openai_endpoint,
+        api_version=s.azure_openai_api_version,
     )
 
 
+def call_llm(client: AzureOpenAI, deployment: str, prompt: str, system: str = "") -> str:
+    messages = []
+    if system:
+        messages.append({"role": "system", "content": system})
+    messages.append({"role": "user", "content": prompt})
+    response = client.chat.completions.create(model=deployment, messages=messages)
+    return response.choices[0].message.content or ""
+
+
 def load_prompt(filename: str) -> str:
-    settings = Settings()
-    prompt_path = settings.prompts_dir / filename
-    return prompt_path.read_text(encoding="utf-8")
+    s = Settings()
+    return (s.prompts_dir / filename).read_text(encoding="utf-8")

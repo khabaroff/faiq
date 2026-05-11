@@ -3,3 +3,8 @@
 .dolt/
 *.db
 .beads-credential-key
+__pycache__/
+*.pyc
+.env
+data/sources/
+uv.lock
