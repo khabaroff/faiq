@@ -46,9 +46,9 @@ def verify_output(source_text: str, output_text: str, tags: list[str], source_ty
     checks["code_blocks_preserved"] = "```" not in source_text or "```" in output_text
 
     fm = _parse_frontmatter(output_text)
-    required_keys = {"title", "source_type", "source_url", "tags", "date"}
+    required_keys = {"id", "title", "source_type", "status"}
     checks["has_frontmatter"] = bool(fm) and required_keys.issubset(fm.keys())
-    checks["valid_source_type"] = fm.get("source_type", "") in ("article", "reference")
+    checks["valid_source_type"] = fm.get("source_type", "") in ("article", "reference", "note", "file")
 
     if source_type == "article":
         checks["has_body_sections"] = (

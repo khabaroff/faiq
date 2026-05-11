@@ -25,10 +25,17 @@ def strip_frontmatter(text: str) -> str:
 
 
 def _infer_title(body: str, source_url: str) -> str:
+    placeholder_seen = False
     for line in body.splitlines():
         stripped = line.strip()
         if stripped.startswith("# "):
-            return stripped[2:].strip()
+            candidate = stripped[2:].strip()
+            if candidate.lower() == "title":
+                placeholder_seen = True
+                continue
+            return candidate
+        if placeholder_seen and stripped and not stripped.startswith(("#", "-", "*", "`")):
+            return stripped
     tail = source_url.rstrip("/").rsplit("/", 1)[-1] if source_url else ""
     if tail:
         return tail.replace("-", " ").replace("_", " ").title()
@@ -79,6 +86,7 @@ def wrap_with_frontmatter(
     hash8: str | None = None,
     prompt_version: str | None = None,
     source_path: str = "",
+    status: str | None = None,
 ) -> str:
     # Use source_path for title if source_url is empty (common for local files)
     title = _infer_title(body, source_url or source_path)
@@ -94,8 +102,22 @@ def wrap_with_frontmatter(
         page_id = f"src-{date_value}-{h8}"
         page_type = "source-page"
 
-    needs_review = st_lower in ("telegram", "pdf", "file", "article")
-    status = "needs-review" if needs_review else "active"
+    if status == "verified":
+        fm_status = "active"
+        review_required = False
+        verified = True
+    elif status in {"needs-review", "needs_review"}:
+        fm_status = "needs-review"
+        review_required = True
+        verified = False
+    elif status == "active":
+        fm_status = "active"
+        review_required = False
+        verified = False
+    else:
+        review_required = st_lower in ("telegram", "pdf", "file", "article")
+        fm_status = "needs-review" if review_required else "active"
+        verified = False
 
     content_format = _map_content_format(st_lower)
     origin = _map_origin(st_lower)
@@ -109,7 +131,7 @@ def wrap_with_frontmatter(
         f'id: "{page_id}"',
         f'title: "{_quote(title)}"',
         f'type: "{page_type}"',
-        f"status: \"{status}\"",
+        f'status: "{fm_status}"',
         f'source_type: "{st_lower}"',
         f'content_format: "{content_format}"',
         f'origin: "{origin}"',
@@ -132,7 +154,7 @@ def wrap_with_frontmatter(
         else:
             lines.append(f"{key}: []")
 
-    lines.extend(["related: []", f"review_required: {_bool_str(needs_review)}", "verified: false", "quality_score: null", "provenance:", "  extracted: 0", "  inferred: 0", "  ambiguous: 0"])
+    lines.extend(["related: []", f"review_required: {_bool_str(review_required)}", f"verified: {_bool_str(verified)}", "quality_score: null", "provenance:", "  extracted: 0", "  inferred: 0", "  ambiguous: 0"])
 
     if source_path:
         lines.append(f'source_paths:\n  - "{_quote(source_path)}"')

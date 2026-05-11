@@ -61,16 +61,27 @@ def run_pipeline(item: QueueItem) -> dict:
 
             taxonomy = extract_tags(strip_frontmatter(output_text))
             wiki_source_type = "reference" if source_type.value == "GITHUB_REPO" else "article"
+
+            is_file = item.source_kind == SourceKind.FILE
+            source_url = "" if is_file else item.source
+            source_path = item.source if is_file else ""
+
+            body = strip_frontmatter(output_text)
+            status, checks = run_verify(fetched.raw_text, body, taxonomy["tags"], source_type=wiki_source_type)
+            verify_status = "verified" if status == "verified" else "needs-review"
+
             output_text = wrap_with_frontmatter(
-                strip_frontmatter(output_text),
+                body,
                 source_type=wiki_source_type,
-                source_url=item.source,
+                source_url=source_url,
                 tags=taxonomy["tags"],
                 topics=taxonomy["topics"],
                 entities=taxonomy["entities"],
                 concepts=taxonomy["concepts"],
+                source_path=source_path,
+                status=verify_status,
             )
-            status, checks = run_verify(fetched.raw_text, output_text, taxonomy["tags"], source_type=wiki_source_type)
+
             vault_path = store(
                 item.source,
                 fetched.raw_text,

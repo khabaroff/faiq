@@ -51,11 +51,16 @@ def _wiki_subfolder(source_type: str, source: str) -> str:
     return "articles"
 
 
+_PLACEHOLDER_TITLES = {"title", "заголовок", "untitled", "название"}
+
+
 def _extract_title(output_text: str, source: str) -> str:
     for line in output_text.splitlines():
         stripped = line.strip()
         if stripped.startswith("# "):
-            return stripped[2:].strip()
+            candidate = stripped[2:].strip()
+            if candidate.lower() not in _PLACEHOLDER_TITLES:
+                return candidate
 
     source_path = Path(source)
     if source_path.suffix:
