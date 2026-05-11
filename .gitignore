@@ -7,4 +7,8 @@ __pycache__/
 *.pyc
 .env
 data/sources/
+data/logs/
+data/state/
+wiki/extracts/
+wiki/log.md
 uv.lock

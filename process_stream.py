@@ -66,6 +66,11 @@ def main() -> None:
 
     with pipeline_run_lock(lock_path):
         for item in items:
+            if queue.already_processed(item.source, ROOT / "data" / "sources"):
+                log.info("source=%s status=skipped (already processed)", item.source)
+                queue.mark_done(queue_file, item)
+                continue
+
             result = run_pipeline(item)
             if result.get("status") == "failed":
                 log.info("source=%s status=failed error=%s", result["source"], result.get("error", ""))

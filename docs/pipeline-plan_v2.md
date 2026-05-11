@@ -9,6 +9,8 @@
 - `article.md` для статей, постов, текстов и YouTube-транскриптов
 - `reference.md` для GitHub-репозиториев
 
+`article.md` и `reference.md` в MVP считаются не просто output-файлами, а wiki-ready pages с обязательным frontmatter и структурированным body. Базовая schema описана в `docs/wiki-schema-for-guides.md`.
+
 Главная цель MVP: получить устойчивый цикл `ingest -> fetch -> process -> tag -> verify -> store`, который можно гонять по крону на VPS без ручного участия.
 
 ---
@@ -41,6 +43,7 @@
 - Один основной пайплайн, без лишней модульной дробности
 - Промпты живут отдельно в `.md`
 - Один source -> одна canonical папка хранения
+- Итоговые `article.md` / `reference.md` обязаны быть wiki-ready pages
 - Ошибки логируются, обработка не усложняется оркестрацией раньше времени
 
 ---
@@ -94,6 +97,13 @@
 
 Результат: `article.md`
 
+Этот output должен соответствовать wiki schema:
+
+- `type: source-page`
+- `source_type: article|youtube|pdf|note`
+- обязательный frontmatter
+- структурированное body
+
 Правила:
 
 - сохранять все блоки кода verbatim
@@ -110,6 +120,8 @@
 
 Результат: `article.md`
 
+Этот output тоже считается `source-page`, а не отдельным ad hoc форматом.
+
 Правила:
 
 - транскрипт вытягивается целиком
@@ -123,6 +135,13 @@
 - корневых URL репозиториев
 
 Результат: `reference.md`
+
+Этот output должен соответствовать wiki schema:
+
+- `type: reference-page`
+- `source_type: github_repo`
+- обязательный frontmatter
+- структурированное body
 
 Формат:
 
@@ -215,9 +234,17 @@ Fallback:
 
 ### 5. Enrich
 
-В MVP добавляем только теги.
+В MVP enrich должен собирать не только теги, а минимальный wiki metadata layer.
 
-`tags.py` через fast model возвращает JSON-список тегов.
+Минимальный набор:
+
+- `tags`
+- `topics`
+- `entities`
+- `concepts`
+- `related` (может быть пустым в `v1`)
+
+`tags.py` можно расширить или разбить на несколько простых extractor stages, но итоговый `article.md` / `reference.md` должен иметь frontmatter по `docs/wiki-schema-for-guides.md`.
 
 ### 6. Verify
 
@@ -227,7 +254,10 @@ Fallback:
 - frontmatter валиден
 - output не пустой
 - кодовые блоки из source не пропали
-- есть title и tags
+- есть `title`
+- есть `tags`, `topics`, `entities`, `concepts`
+- page type и source type согласованы со schema
+- `review_required`, `verified`, `quality_score`, `provenance`, `source_paths` присутствуют
 
 Поведение:
 
@@ -273,6 +303,45 @@ guides/prompts/
 - каждый processor читает свой `.md`
 - prompt version можно писать в frontmatter output-файла
 - пользователь редактирует промпты без правок Python-кода
+
+---
+
+## Wiki schema
+
+MVP официально включает wiki-ready schema для итоговых материалов.
+
+Итог:
+
+- `source.md` — raw immutable source
+- `article.md` — `source-page`
+- `reference.md` — `reference-page`
+
+Обязательный frontmatter contract задаётся в [docs/wiki-schema-for-guides.md](/Users/khabaroff/GOO_LIBARCH/guides/docs/wiki-schema-for-guides.md:1).
+
+Минимально обязательные поля для итоговых страниц:
+
+- `id`
+- `title`
+- `type`
+- `status`
+- `source_type`
+- `content_format`
+- `origin`
+- `created_at`
+- `updated_at`
+- `language`
+- `tags`
+- `topics`
+- `entities`
+- `concepts`
+- `related`
+- `review_required`
+- `verified`
+- `quality_score`
+- `provenance`
+- `source_paths`
+
+Это часть MVP, а не future enhancement.
 
 ---
 
@@ -384,7 +453,7 @@ azure_deployment_fast: str | None
 3. `guides/process/reference.py`
 4. `guides/process/youtube.py`
 
-Результат: из fetched content получается целевой markdown.
+Результат: из fetched content получается целевой markdown в wiki-ready формате, а не просто summary text.
 
 ### Фаза 4. Enrich + verify
 
@@ -436,6 +505,10 @@ azure_deployment_fast: str | None
 ### 3. GitHub reference prompt
 
 До кода стоит зафиксировать шаблон `reference.md`, чтобы не менять потом формат статей и verify-логику.
+
+### 4. Wiki schema adoption
+
+Перед полноценной реализацией processors и verify нужно считать `docs/wiki-schema-for-guides.md` source of truth для структуры `article.md` и `reference.md`.
 
 ---
 

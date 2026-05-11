@@ -2,9 +2,9 @@
 
 > **For Claude:** REQUIRED SUB-SKILL: Use superpowers:executing-plans to implement this plan task-by-task.
 
-**Goal:** Собрать минимальный рабочий pipeline для `guides/`, который принимает URL и локальные файлы, строит `article.md` или `reference.md` и сохраняет результат в canonical storage.
+**Goal:** Собрать минимальный рабочий pipeline для `guides/`, который принимает URL и локальные файлы, строит wiki-ready `article.md` или `reference.md` и сохраняет результат в canonical storage.
 
-**Architecture:** Один Python pipeline с тремя source type: `ARTICLE`, `YOUTUBE`, `GITHUB_REPO`. Один cron entrypoint `process_stream.py` читает `data/queue/inbox.txt` и `data/inbox/`, дальше запускает `detect -> fetch -> process -> tags -> verify -> store`. Промпты лежат отдельно в `guides/prompts/*.md`.
+**Architecture:** Один Python pipeline с тремя source type: `ARTICLE`, `YOUTUBE`, `GITHUB_REPO`. Один cron entrypoint `process_stream.py` читает `data/queue/inbox.txt` и `data/inbox/`, дальше запускает `detect -> fetch -> process -> enrich -> verify -> store`. Промпты лежат отдельно в `guides/prompts/*.md`. Итоговые pages обязаны соответствовать `docs/wiki-schema-for-guides.md`.
 
 **Tech Stack:** Python, `openai` Azure SDK, `yt-dlp`, `defuddle-cli`, GitHub API, markdown files, cron.
 
@@ -51,10 +51,15 @@ git commit -m "feat: add guides project skeleton"
 - Create: `guides/prompts/github_reference.md`
 - Create: `guides/prompts/tags_extract.md`
 - Create: `guides/prompts/verify_check.md`
+- Create: `docs/frontmatter-examples.md`
 
 **Step 1: Add prompt files**
 
 Create one markdown prompt file per processor.
+
+**Step 1.1: Add frontmatter examples**
+
+Create reference examples for article / youtube / github / pdf / note / telegram outputs.
 
 **Step 2: Add LLM client factory**
 
@@ -104,6 +109,8 @@ data/sources/YYYY-MM-DD_{hash8}/
 ├── meta.json
 └── images/
 ```
+
+The storage layer must support writing wiki-ready `article.md` / `reference.md` with frontmatter from `docs/wiki-schema-for-guides.md`.
 
 **Step 3: Verify storage write**
 
@@ -226,10 +233,12 @@ Rules:
 - keep code verbatim
 - keep prompts verbatim
 - compress prose carefully
+- emit wiki-ready `source-page` frontmatter and structured body
 
 **Step 2: Implement YouTube processor**
 
 Support transcript chunking when needed.
+Emit wiki-ready `source-page` output with `content_format: transcript`.
 
 **Step 3: Implement GitHub reference processor**
 
@@ -240,6 +249,7 @@ Output sections:
 - key concepts
 - quick start
 - links
+- emit wiki-ready `reference-page` frontmatter and structured body
 
 **Step 4: Verify each processor with fixture input**
 
@@ -262,12 +272,24 @@ git commit -m "feat: add content processors"
 
 Return normalized JSON tag list.
 
+**Step 1.1: Extend enrich output**
+
+In addition to tags, populate:
+- `topics`
+- `entities`
+- `concepts`
+- `related` (empty list allowed in MVP)
+
 **Step 2: Implement deterministic verify**
 
 Checks:
 - output exists
 - title exists
+- wiki-ready frontmatter exists
 - tags exist
+- topics exist
+- entities exist
+- concepts exist
 - output not empty
 - code blocks not dropped
 
@@ -372,7 +394,7 @@ Verify:
 
 Expected:
 - folders created in `data/sources/`
-- output markdown readable
+- output markdown readable and wiki-ready
 - failures marked as `needs_review`
 
 **Step 3: Document operational caveats**
@@ -404,8 +426,8 @@ data/sources/YYYY-MM-DD_{hash8}/
 Где что:
 
 - `source.md` — исходный материал в raw/normalized виде
-- `article.md` — итоговая статья по статье, тексту, PDF или YouTube
-- `reference.md` — итоговая справка по GitHub-репозиторию
+- `article.md` — итоговая wiki-ready source page по статье, тексту, PDF или YouTube
+- `reference.md` — итоговая wiki-ready reference page по GitHub-репозиторию
 - `meta.json` — метаданные, source URL/path, type, verify status, tags, timestamps
 - `images/` — скачанные картинки, если нужны
 

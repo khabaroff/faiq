@@ -1,3 +1,3 @@
 # By Kind
-## reference
-- [[llm]] - LLM
+## article
+- [[building-effective-agents]] - Building Effective Agents

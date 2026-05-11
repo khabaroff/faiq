@@ -109,48 +109,83 @@ bd close <id>         # Complete work
 <claude-mem-context>
 # Memory Context
 
-# [guides] recent context, 2026-05-11 10:58am GMT+4
+# [guides] recent context, 2026-05-11 2:08pm GMT+4
 
 Legend: 🎯session 🔴bugfix 🟣feature 🔄refactor ✅change 🔵discovery ⚖️decision 🚨security_alert 🔐security_note
 Format: ID TIME TYPE TITLE
 Fetch details: get_observations([IDs]) | Search: mem-search skill
 
-Stats: 24 obs (12,751t read) | 215,185t work | 94% savings
+Stats: 50 obs (15,758t read) | 210,549t work | 93% savings
 
 ### May 11, 2026
-S328 Init: Explore GOO_LIBARCH/guides project structure, understand OpenSpec workflow, update CLAUDE.md with production guidance (May 11 at 10:06 AM)
-S327 Initialize guides project by exploring directory structure and creating project configuration (May 11 at 10:06 AM)
-732 10:07a 🔵 Project uses Beads (bd) for issue tracking with mandatory git push workflow
-733 10:08a ✅ Updated CLAUDE.md with filled-in OpenSpec workflow and project structure
-S329 User examined 5 reference repositories as context: usiki (Mnemon Knowledge Vault), usiki-docs (Russian knowledge vault), khabaroff-writer (Telegram bot), LAAI (knowledge system research), LAAI-refrepos (30+ reference projects). Goal: establish reference architecture and scope boundaries before active work. (May 11 at 10:08 AM)
-734 10:13a 🔵 User's Multi-Repository Knowledge System Architecture
-736 " ✅ Added Model Delegation and Context Management sections to guides CLAUDE.md
-735 10:14a 🔵 LAAI PRD Documentation Structure and Operational Model
-S330 Init: Establish OpenSpec workflow, project structure, and AI delegation patterns in guides project CLAUDE.md (May 11 at 10:14 AM)
-S333 Review comprehensive architecture plan for guides/ — technical content pipeline project. User requested full plan examination and commentary. (May 11 at 10:15 AM)
-737 10:17a 🔵 guides/task.md: Content Pipeline for Technical Learning Materials
-738 " 🔵 usiki Mnemon Vault: Live Extract Example (YouTube Interview Transcription)
-739 " 🔵 khabaroff-writer Deployment Architecture: Multi-Tier LLM Routing with Fallbacks
-740 " 🔵 LAAI-refrepos Reference Inventory: 33 Knowledge System Implementations
-741 10:18a ⚖️ Simple Cron-Based Content Pipeline Scope for task.md
-742 10:24a ⚖️ guides/ Pipeline Architecture: Sequential Processing with Queue-Based Streams
-743 10:28a ⚖️ guides/ content pipeline architecture — multi-stage async design
-S334 Document and export guides/ pipeline architecture plan to project docs. User requested full plan be written to file and open for feedback. (May 11 at 10:29 AM)
-S335 MVP Product Director analysis: Review guides pipeline plan and identify what to build vs. cut without over-engineering (May 11 at 10:30 AM)
-745 10:41a ⚖️ Pipeline v1 Scope Reduction: Defer Complex Features
-744 " ⚖️ MVP Scope: Cut 5 features, collapse streams, simplify structure
-S336 Locate SENIOR and JUNIOR surfaces in cmux workspaces (May 11 at 10:43 AM)
-746 10:50a ⚖️ MVP scope refined: explicit cuts from original pipeline plan
-747 " ⚖️ Three unresolved architecture questions documented for MVP implementation
-748 10:52a ✅ Pipeline plan refined and saved as v2: clean MVP architecture with 7 stages and 3 source types
-750 10:54a ✅ Implementation plan created: 11 tasks from skeleton to VPS smoke test
-749 10:55a 🔵 Located SENIOR and JUNIOR surfaces in cmux workspace
-S337 Evaluate task management approaches for SENIOR and JUNIOR agent dispatch (May 11 at 10:56 AM)
-751 10:57a 🔵 Beads (bd) task management tool is installed and available
-752 " 🔵 SENIOR and JUNIOR are Claude agents with Azure Foundry MCP backends
-753 " 🔵 Beads (bd) workflow conventions established for guides project
-754 " 🔵 guides project MVP specification: content ingestion pipeline
-755 " 🔵 Guides MVP implementation plan: 11 sequential tasks with verification
+844 12:17p 🔵 LAAI Project Architecture: Three-Layer Wiki with Log-Driven Event Tracking
+846 12:18p 🟣 Ingestion fixture matrix and smoke test completed
+847 " 🔵 Task progression: fixture matrix closed; P0 pipeline MVP next ready
+848 12:19p ✅ Smoke test validation requested for fixture matrix implementation
+853 12:24p ✅ JUNIOR assigned integration validation task while SENIOR finishes
+854 12:26p 🟣 Processor schema implementation completed and committed
+856 " ✅ Schema enforcement implementation complete; P0 pipeline MVP unblocked
+860 12:27p ✅ Reference document body section validation expanded
+863 12:28p 🔵 Pipeline bug: verify() not receiving source_type parameter
+864 " ✅ Prepare run.py fix for source_type parameter handling
+865 12:29p ✅ Pipeline bug fixed: source_type parameter and frontmatter tags population
+867 " 🔵 Frontmatter tags extraction failing: YAML list parsing issue
+868 " ✅ Frontmatter parser enhanced to handle YAML list format
+870 12:30p ✅ Project milestone: P0 content pipeline MVP completed; all tasks closed
+871 12:33p ⚖️ Wiki V1 Architecture: Two-Zone Model with Source-Type Organization
+872 12:34p 🟣 Wiki Schema Enforcement Across Processors and Verification
+873 12:36p ⚖️ Wiki V1 Roadmap Created: Seven P1 Issues for Implementation
+874 12:40p 🔵 ALF repository structure and composition
+875 " 🔵 ALF (Adaptive Learning Feed) architecture and implementation status
+876 " 🔵 Cost tracking and LLM routing infrastructure
+888 12:52p 🟣 Wiki V1 filesystem layout fully implemented with dual-layer storage
+889 " 🟣 Prompts adapted to dense Russian extract-page format for Wiki V1
+890 " 🔵 Index rebuild system designed to populate from extract pages on first real pipeline run
+891 12:58p 🔵 Wiki index generation task guides-qey completed and closed
+892 " 🔵 Wiki V1 schema implementation checkpoint: 4 major tasks completed, 1 in progress
+893 " ⚖️ Task dispatch: Cost accounting helper (guides-p53) assigned to JUNIOR
+894 12:59p ⚖️ Task decomposition: guides-oio split into sequential curation phases
+895 1:00p 🟣 Cost accounting module guides-p53 completed and committed
+896 " 🟣 Wiki V1 prompt adaptation guides-ley completed
+897 " 🔵 Wiki V1 infrastructure complete: 6 tasks shipped in single session
+898 " ✅ Task queue evolved: Wiki V1 + accounting complete, next phase is corpus curation and validation
+899 1:01p 🔵 Next phase tasks planned: cost reporting + corpus curation for smoke testing
+900 " ⚖️ Three testing/reporting tasks claimed and dispatched
+901 " ⚖️ Corpus curation tasks dispatched: ALF and LAAI candidate selection
+902 " 🔵 Progress on cost report and corpus curation; JUNIOR hit permission check
+908 1:02p 🔵 JUNIOR scanning ALF and LAAI corpus; SENIOR building cost report script
+914 1:06p 🟣 Cost report script guides-0sq created and staged in git
+917 " 🟣 Cost accounting integration verified in guides/llm.py call_llm()
+918 1:07p 🔵 Deployment names configured in settings.py for cost tracking
+S386 Complete Wiki V1 pipeline infrastructure setup and preparation. Prepare clean environment for end-to-end pipeline test (guides-5ei). Monitor parallel agent execution (SENIOR Langfuse, JUNIOR pipeline test). (May 11 at 1:14 PM)
+S400 Monitor agents (SENIOR surface:23, JUNIOR surface:12) in workspace:5 every 2 minutes: detect "TASK N DONE" markers, close completed tasks via bd, dispatch next work from bd ready queue (May 11 at 1:15 PM)
+S401 Monitor two parallel agents (SENIOR/JUNIOR) every 2 minutes to manage Wiki V1 infrastructure completion: detect task completion markers, close finished tasks, and dispatch next work from task queue (May 11 at 1:16 PM)
+S402 Continuous /loop monitoring of two Claude agents (SENIOR/surface:23, JUNIOR/surface:12) in workspace:5 via cmux, dispatching tasks from bd queue every 2 minutes, detecting completion markers and managing task lifecycle (May 11 at 1:34 PM)
+S403 Monitor two Claude agents (SENIOR/surface:23, JUNIOR/surface:12) in workspace:5, dispatch Wiki V1 infrastructure tasks from bd queue every 2 minutes, detect completion markers, manage task lifecycle until pipeline finalization (May 11 at 1:34 PM)
+S404 Continue /loop monitoring of two agents (SENIOR/surface:23 patching wiki.py, JUNIOR/surface:12 validating source/output pairs). Maintain 2-minute polling interval, await task completion markers, dispatch next work items. (May 11 at 1:40 PM)
+S406 Set up multi-agent task supervision system with autonomous task distribution and monitoring loop between SENIOR and JUNIOR agents (May 11 at 1:41 PM)
+S407 Multi-agent task supervision: recovering SENIOR agent from Gemini API error, JUNIOR continues processing (May 11 at 2:05 PM)
+S408 Multi-agent task supervision: recover SENIOR from error, dispatch concurrent tasks, autonomous monitoring (May 11 at 2:05 PM)
+956 2:06p 🔵 SENIOR agent recovered from Gemini API error
+957 " 🟣 guides-9yn task dispatched to SENIOR: concurrent pipeline duplicate protection verification
+958 " 🔵 SENIOR: pytest dependency missing in project venv
+959 " 🔵 JUNIOR appears hung or unresponsive to input
+960 2:07p 🔵 Supervisor prompts JUNIOR for status/completion after hung state
+961 " 🔵 JUNIOR responsive: shows progress on ongoing task (~50% complete)
+962 " 🟣 SENIOR successfully ran pipeline lock test — test passed
+963 " 🟣 SENIOR analyzing and fixing redundant processing logic
+964 " 🟣 JUNIOR completed guides-e1s task — completion signal detected
+965 2:08p 🔵 guides-e1s closed successfully, task queue stalled on blocking dependencies
+966 " ✅ Supervisor notified JUNIOR: task queue blocked, agent to idle
+S409 Multi-agent task supervision: manage concurrent work on guides backlog, handle dependency blocking, autonomous agent monitoring (May 11 at 2:08 PM)
+**Investigated**: SENIOR: pipeline lock mechanism verification (test passed 1/1), redundant processing fix implementation. JUNIOR: URL extraction task from file contents (completed). Task queue state: blocked on dependencies. Agent error recovery: /clear context reset effectiveness.
 
-Access 215k tokens of past work via get_observations([IDs]) or mem-search skill.
+**Learned**: Agent recovery pattern: context reset via /clear successful for protocol errors. Test validation via direct Python when pytest unavailable. Task completion signaling: agents write "TASK N DONE" marker. Queue blocking: dependent tasks cannot progress until prerequisites complete. Multi-agent concurrency: both agents work independently, supervisor coordinates via cmux surfaces and bd task system.
+
+**Completed**: JUNIOR completed guides-e1s task (URL extraction utility). Task closed in bd. SENIOR verified test_process_stream_lock.py passes (1 test, 0.001s). SENIOR reading code files (process_stream.py, validation logic). Supervisor recovered from Gemini API errors via context reset. Autonomous 2-minute monitoring loop active.
+
+**Next Steps**: SENIOR finalizing guides-9yn: complete redundant processing fix analysis and document findings. JUNIOR idle waiting for task queue unblock (blocked on dependency resolution). Supervisor checks both agents every 2 minutes (next at 14:11 UTC). Monitor for SENIOR completion signal "TASK guides-9yn DONE" and close task when ready.
+
+
+Access 211k tokens of past work via get_observations([IDs]) or mem-search skill.
 </claude-mem-context>
