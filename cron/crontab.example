@@ -1,0 +1,1 @@
+*/15 * * * * uv run python process_stream.py
