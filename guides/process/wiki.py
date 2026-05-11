@@ -87,6 +87,7 @@ def wrap_with_frontmatter(
     prompt_version: str | None = None,
     source_path: str = "",
     status: str | None = None,
+    quality_score: float | None = None,
 ) -> str:
     # Use source_path for title if source_url is empty (common for local files)
     title = _infer_title(body, source_url or source_path)
@@ -154,7 +155,8 @@ def wrap_with_frontmatter(
         else:
             lines.append(f"{key}: []")
 
-    lines.extend(["related: []", f"review_required: {_bool_str(review_required)}", f"verified: {_bool_str(verified)}", "quality_score: null", "provenance:", "  extracted: 0", "  inferred: 0", "  ambiguous: 0"])
+    qs_str = f"{quality_score:.2f}" if quality_score is not None else "null"
+    lines.extend(["related: []", f"review_required: {_bool_str(review_required)}", f"verified: {_bool_str(verified)}", f"quality_score: {qs_str}", "provenance:", "  extracted: 0", "  inferred: 0", "  ambiguous: 0"])
 
     if source_path:
         lines.append(f'source_paths:\n  - "{_quote(source_path)}"')

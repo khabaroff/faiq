@@ -83,9 +83,11 @@ def run_pipeline(item: QueueItem) -> dict:
             )
             output_text = wrap_with_frontmatter(body, **wrap_kwargs)
 
-            status, checks = run_verify(fetched.raw_text, output_text, taxonomy["tags"], source_type=wiki_source_type)
+            status, checks, quality_score = run_verify(fetched.raw_text, output_text, taxonomy["tags"], source_type=wiki_source_type)
             if status == "verified":
-                output_text = wrap_with_frontmatter(body, **wrap_kwargs, status="verified")
+                output_text = wrap_with_frontmatter(body, **wrap_kwargs, status="verified", quality_score=quality_score)
+            else:
+                output_text = wrap_with_frontmatter(body, **wrap_kwargs, quality_score=quality_score)
 
             vault_path = store(
                 item.source,

@@ -84,6 +84,9 @@ def verify_output(source_text: str, output_text: str, tags: list[str], source_ty
 
 def run_verify(source_text: str, output_text: str, tags: list[str], max_attempts: int = 3, source_type: str = "article") -> tuple:
     result = verify_output(source_text, output_text, tags, source_type=source_type)
-    if not result["checks"].get("has_frontmatter", True):
-        return ("needs_review", result)
-    return ("verified", result) if result["passed"] else ("needs_review", result)
+    checks = result["checks"]
+    quality_score = round(sum(checks.values()) / len(checks), 2) if checks else 0.0
+    if not checks.get("has_frontmatter", True):
+        return ("needs_review", result, quality_score)
+    status = "verified" if result["passed"] else "needs_review"
+    return (status, result, quality_score)
