@@ -21,10 +21,13 @@ def main() -> None:
     items = queue.pop_pending(queue_file)
     items.extend(queue.scan_inbox(inbox_dir))
 
+    quarantine_file = ROOT / "data" / "queue" / "needs_review.txt"
+
     for item in items:
         result = run_pipeline(item)
         if result.get("status") == "failed":
             log.info("source=%s status=failed error=%s", result["source"], result.get("error", ""))
+            queue.quarantine(item, result.get("error", "unknown"), quarantine_file)
             continue
 
         log.info(

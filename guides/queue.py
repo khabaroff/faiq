@@ -76,18 +76,28 @@ def pop_pending(queue_file: Path) -> list[QueueItem]:
     seen: set[str] = set()
     items: list[QueueItem] = []
     for line in queue_file.read_text(encoding="utf-8").splitlines():
-        stripped = line.strip()
-        if not stripped or stripped.startswith("#"):
+        try:
+            stripped = line.strip()
+            if not stripped or stripped.startswith("#"):
+                continue
+            if stripped in seen:
+                continue
+            if not _is_valid_line(stripped):
+                logger.warning("Skipping malformed line: %s", stripped)
+                continue
+            seen.add(stripped)
+            kind = SourceKind.URL if stripped.startswith("http") else SourceKind.FILE
+            items.append(QueueItem(source=stripped, source_kind=kind, received_at=datetime.now(), origin="queue"))
+        except Exception as e:
+            logger.warning("Error processing queue line '%s': %s", line, e)
             continue
-        if stripped in seen:
-            continue
-        if not _is_valid_line(stripped):
-            logger.warning("Skipping malformed line: %s", stripped)
-            continue
-        seen.add(stripped)
-        kind = SourceKind.URL if stripped.startswith("http") else SourceKind.FILE
-        items.append(QueueItem(source=stripped, source_kind=kind, received_at=datetime.now(), origin="queue"))
     return items
+
+
+def quarantine(item: QueueItem, reason: str, quarantine_file: Path) -> None:
+    line = f"#failed# {datetime.now().isoformat()} {reason} | {item.source}\n"
+    with open(quarantine_file, "a", encoding="utf-8") as f:
+        f.write(line)
 
 
 def mark_done(queue_file: Path, item: QueueItem) -> None:
@@ -109,30 +119,45 @@ def scan_inbox(inbox_dir: Path) -> list[QueueItem]:
     settings = Settings()
     items: list[QueueItem] = []
     for f in sorted(inbox_dir.iterdir()):
-        if not f.is_file() or f.name.startswith("."):
-            continue
-        if f.name.startswith("#done#"):
-            continue
-        source = str(f)
-        if _already_processed(source, settings.data_dir / "sources"):
-            continue
-        if f.suffix.lower() in {".txt", ".md"}:
-            content = f.read_text(encoding="utf-8")
-            classification = _classify_text_file(content)
-            urls = _extract_urls(content)
-
-            if classification == "single_url" and urls:
-                items.append(
-                    QueueItem(source=urls[0], source_kind=SourceKind.URL, received_at=datetime.now(), origin="inbox")
-                )
+        try:
+            if not f.is_file() or f.name.startswith("."):
+                continue
+            if f.name.startswith("#done#"):
                 continue
 
-            if classification == "url_list" and urls:
-                for url in urls:
+            if f.stat().st_size == 0:
+                logger.warning("Skipping empty file: %s", f.name)
+                continue
+
+            ext = f.suffix.lower()
+            if ext not in _TEXT_EXTENSIONS:
+                logger.warning("Unsupported file type '%s': %s", ext, f.name)
+                continue
+
+            source = str(f)
+            if _already_processed(source, settings.data_dir / "sources"):
+                continue
+
+            if ext in {".txt", ".md", ""}:
+                content = f.read_text(encoding="utf-8")
+                classification = _classify_text_file(content)
+                urls = _extract_urls(content)
+
+                if classification == "single_url" and urls:
                     items.append(
-                        QueueItem(source=url, source_kind=SourceKind.URL, received_at=datetime.now(), origin="inbox")
+                        QueueItem(source=urls[0], source_kind=SourceKind.URL, received_at=datetime.now(), origin="inbox")
                     )
-                continue
+                    continue
 
-        items.append(QueueItem(source=source, source_kind=SourceKind.FILE, received_at=datetime.now(), origin="inbox"))
+                if classification == "url_list" and urls:
+                    for url in urls:
+                        items.append(
+                            QueueItem(source=url, source_kind=SourceKind.URL, received_at=datetime.now(), origin="inbox")
+                        )
+                    continue
+
+            items.append(QueueItem(source=source, source_kind=SourceKind.FILE, received_at=datetime.now(), origin="inbox"))
+        except Exception as e:
+            logger.warning("Error processing inbox file %s: %s", f.name, e)
+            continue
     return items
