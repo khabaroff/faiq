@@ -1,18 +1,20 @@
 from __future__ import annotations
 
 import logging
-import sys
 from pathlib import Path
 
 from guides import queue
+from guides.log_setup import setup_logging
 from guides.run import run_pipeline
+from guides.tracing import init_tracing
 
 
 ROOT = Path(__file__).resolve().parent
 
 
 def main() -> None:
-    logging.basicConfig(level=logging.INFO, stream=sys.stdout, format="%(message)s")
+    setup_logging(ROOT / "data" / "logs")
+    init_tracing()
     log = logging.getLogger("process_stream")
 
     queue_file = ROOT / "data" / "queue" / "inbox.txt"

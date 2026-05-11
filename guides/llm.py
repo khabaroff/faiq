@@ -30,9 +30,11 @@ def call_llm(client: OpenAI, deployment: str, prompt: str, system: str = "") -> 
     response = client.chat.completions.create(model=deployment, messages=messages)
 
     from guides.enrich.accounting import extract_usage, record_to_log_extra
+    from guides.tracing import get_current_trace, trace_llm_call
 
     rec = extract_usage(response, deployment)
     logger.info("llm_call", extra={"extra": record_to_log_extra(rec)})
+    trace_llm_call(get_current_trace(), deployment, rec.prompt_tokens, rec.completion_tokens, rec.cost_usd)
 
     return response.choices[0].message.content or ""
 
