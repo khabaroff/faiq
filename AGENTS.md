@@ -109,7 +109,7 @@ bd close <id>         # Complete work
 <claude-mem-context>
 # Memory Context
 
-# [guides] recent context, 2026-05-11 8:28pm GMT+4
+# [guides] recent context, 2026-05-11 8:34pm GMT+4
 
 Legend: 🎯session 🔴bugfix 🟣feature 🔄refactor ✅change 🔵discovery ⚖️decision 🚨security_alert 🔐security_note
 Format: ID TIME TYPE TITLE
@@ -136,8 +136,6 @@ Stats: 50 obs (14,887t read) | 219,046t work | 93% savings
 1096 " ✅ GitHub and YouTube ingestion tests dispatched to both agents
 1099 " 🔵 YouTube test incomplete: youtubes/ directory empty, no test file created
 1100 2:54p 🔵 SENIOR completed GitHub test: repo extraction and wiki generation successful
-S427 Monitor agent task execution and collect completion status; document progress on guides-y4y (P1 URL extraction fix) and JUNIOR recovery attempts (May 11 at 3:19 PM)
-S428 Continue monitoring guides-y4y task execution on SENIOR agent; track test-driven development progress for URL extraction fix (May 11 at 3:20 PM)
 S429 Recover guides-y4y task execution after Gemini API error; request SENIOR to continue work or report status (May 11 at 3:21 PM)
 S431 Plan next phase of development in guides project after completing 5 feature tasks and closing all open issues (May 11 at 3:22 PM)
 S432 Plan next phase of guides project development; clarify direction after completing 5 feature tasks (May 11 at 3:22 PM)
@@ -145,10 +143,11 @@ S433 Continuous monitoring and planning status during agent infrastructure outag
 S434 Plan next development phase; awaiting user direction while agents remain non-functional (May 11 at 3:36 PM)
 S435 Plan and execute next development phase after completing 5 core features; agents non-functional, awaiting direction (May 11 at 3:37 PM)
 S436 Continue session after queue emptied; assess current status and plan next work (May 11 at 3:38 PM)
+S437 Assess queue state and identify next work: add new URLs, fix gist URL support, or other tasks (May 11 at 8:21 PM)
 1147 8:21p 🔵 Wiki extracts inventory and directory structure
 1149 8:22p 🔵 GitHub gist fetch failures in needs_review queue
 1150 " 🔵 Inbox queue state: one YouTube video processed
-S437 Assess queue state and identify next work: add new URLs, fix gist URL support, or other tasks (May 11 at 8:22 PM)
+S442 Fix GitHub gist URL routing and implement end-to-end processing with graceful fallback (continuation from prior session) (May 11 at 8:22 PM)
 1153 " 🔵 URL fetcher architecture: multi-strategy chain for content extraction
 1155 " 🔵 GitHub URL routing excludes gist URLs; root cause of fetch failures
 1156 " 🔵 Fetch module architecture: specialized handlers for source types
@@ -178,6 +177,35 @@ S437 Assess queue state and identify next work: add new URLs, fix gist URL suppo
 1183 " 🟣 Gist URL processed via process_stream.py entry point; dedup check marked as already processed
 1185 8:27p 🔵 Previous gist processing failed with "gist_not_supported" error; old failure entry blocking reprocess
 1187 " 🔵 Gist URL failed silently on reprocess; no entry in sources directory
+S443 Audit and fix GitHub gist URL pipeline issues; document configuration gaps and cost optimization opportunities (May 11 at 8:32 PM)
+**Investigated**: - Settings.py configuration structure (Azure OpenAI, GitHub token, Jina, Langfuse)
+    - Runtime config state: github_token MISSING, azure_deployment_smart=gpt-5.4, azure_deployment_fast=gpt-5.4-mini
+    - defuddle-cli availability and command structure (v0.1.0 via npx, requires "parse" subcommand)
+    - HTTP markdown behavior on gist.github.com (404) vs raw.githubusercontent.com (200 OK, 16.4KB)
+    - Fetcher fallback chain: defuddle → Jina → http-markdown
+    - Cost tracking: 86 calls, 657K tokens, $3.22 total
+
+**Learned**: - defuddle-cli has required subcommand "parse"; code called without it → always failed silently → fell back to Jina
+    - GitHub API anonymous rate limit: 60 req/hour, triggers 502 on limit overflow (no auth token configured)
+    - Gist URLs return 404 on direct HTTP; need GitHub API (/gists/{id}) or Jina reader proxy
+    - raw.githubusercontent.com serves markdown as plain text/plain content-type (not text/markdown), still parseable
+    - http-markdown filter rejects text/html content-type (correct design, filters out web pages)
+    - Model routing: gpt-5.4 (smart, expensive) used for article rewrite; gpt-5.4-mini (fast) for YouTube chunks
+    - Cost per document: $3.22 ÷ 13 docs = $0.24/doc (high due to gpt-5.4 volume)
+
+**Completed**: - Fixed defuddle-cli subprocess calls: added "parse" subcommand in both npx and local paths (lines 32, 39)
+    - Test confirmed fix: `npx defuddle-cli parse https://example.com` returns 186 bytes (works)
+    - Created docs/todo.md with 7 prioritized issues, config status table, 4 improvements, cost analysis
+    - Committed: "fix(fetch): correct defuddle-cli subcommand + add todo doc" (2 files, 90 insertions)
+    - Documented critical gaps: GITHUB_TOKEN (rate limit fix), Jina API key (throttle lift), needs_review cleanup
+
+**Next Steps**: Address critical config items from TODO:
+    1. Add GITHUB_TOKEN to .env (PAT with gist read scope) → eliminates 502 errors on rate limit
+    2. Add jina_api_key to Settings.py and pass Bearer auth to _try_jina() → lift 5 req/min throttle
+    3. Implement README fallback (main → master → HEAD) in fetch_github_repo()
+    4. Test defuddle fallback path on real article URLs to verify "parse" subcommand fix works end-to-end
+    5. Optional: migrate article rewrite from gpt-5.4 to gpt-5.4-mini for cost reduction (~80% savings)
+
 
 Access 219k tokens of past work via get_observations([IDs]) or mem-search skill.
 </claude-mem-context>

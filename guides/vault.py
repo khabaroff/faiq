@@ -1,9 +1,12 @@
 import hashlib
 import json
+import logging
 import re
 from datetime import datetime
 from pathlib import Path
 from typing import Any
+
+logger = logging.getLogger(__name__)
 
 
 def hash_source(source: str) -> str:
@@ -161,8 +164,16 @@ def store(
 
     title, slug = _wiki_slug(output_text, source, wiki_sub)
     wiki_path = wiki_sub / f"{slug}.md"
-    wiki_path.write_text(output_text, encoding="utf-8")
-    _append_wiki_log(wiki_dir, title, source_subfolder, slug)
+
+    if wiki_path.exists():
+        logger.warning("Wiki page already exists at %s, skipping duplicate", wiki_path)
+        return wiki_path
+
+    if status in ("failed", "needs_review"):
+        logger.info("Skipping wiki write for %s — status=%s", source, status)
+    else:
+        wiki_path.write_text(output_text, encoding="utf-8")
+        _append_wiki_log(wiki_dir, title, source_subfolder, slug)
 
     from guides.enrich.indexes import rebuild_indexes
     rebuild_indexes(wiki_dir)
