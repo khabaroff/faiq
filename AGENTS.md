@@ -109,83 +109,75 @@ bd close <id>         # Complete work
 <claude-mem-context>
 # Memory Context
 
-# [guides] recent context, 2026-05-11 2:08pm GMT+4
+# [guides] recent context, 2026-05-11 8:28pm GMT+4
 
 Legend: 🎯session 🔴bugfix 🟣feature 🔄refactor ✅change 🔵discovery ⚖️decision 🚨security_alert 🔐security_note
 Format: ID TIME TYPE TITLE
 Fetch details: get_observations([IDs]) | Search: mem-search skill
 
-Stats: 50 obs (15,758t read) | 210,549t work | 93% savings
+Stats: 50 obs (14,887t read) | 219,046t work | 93% savings
 
 ### May 11, 2026
-844 12:17p 🔵 LAAI Project Architecture: Three-Layer Wiki with Log-Driven Event Tracking
-846 12:18p 🟣 Ingestion fixture matrix and smoke test completed
-847 " 🔵 Task progression: fixture matrix closed; P0 pipeline MVP next ready
-848 12:19p ✅ Smoke test validation requested for fixture matrix implementation
-853 12:24p ✅ JUNIOR assigned integration validation task while SENIOR finishes
-854 12:26p 🟣 Processor schema implementation completed and committed
-856 " ✅ Schema enforcement implementation complete; P0 pipeline MVP unblocked
-860 12:27p ✅ Reference document body section validation expanded
-863 12:28p 🔵 Pipeline bug: verify() not receiving source_type parameter
-864 " ✅ Prepare run.py fix for source_type parameter handling
-865 12:29p ✅ Pipeline bug fixed: source_type parameter and frontmatter tags population
-867 " 🔵 Frontmatter tags extraction failing: YAML list parsing issue
-868 " ✅ Frontmatter parser enhanced to handle YAML list format
-870 12:30p ✅ Project milestone: P0 content pipeline MVP completed; all tasks closed
-871 12:33p ⚖️ Wiki V1 Architecture: Two-Zone Model with Source-Type Organization
-872 12:34p 🟣 Wiki Schema Enforcement Across Processors and Verification
-873 12:36p ⚖️ Wiki V1 Roadmap Created: Seven P1 Issues for Implementation
-874 12:40p 🔵 ALF repository structure and composition
-875 " 🔵 ALF (Adaptive Learning Feed) architecture and implementation status
-876 " 🔵 Cost tracking and LLM routing infrastructure
-888 12:52p 🟣 Wiki V1 filesystem layout fully implemented with dual-layer storage
-889 " 🟣 Prompts adapted to dense Russian extract-page format for Wiki V1
-890 " 🔵 Index rebuild system designed to populate from extract pages on first real pipeline run
-891 12:58p 🔵 Wiki index generation task guides-qey completed and closed
-892 " 🔵 Wiki V1 schema implementation checkpoint: 4 major tasks completed, 1 in progress
-893 " ⚖️ Task dispatch: Cost accounting helper (guides-p53) assigned to JUNIOR
-894 12:59p ⚖️ Task decomposition: guides-oio split into sequential curation phases
-895 1:00p 🟣 Cost accounting module guides-p53 completed and committed
-896 " 🟣 Wiki V1 prompt adaptation guides-ley completed
-897 " 🔵 Wiki V1 infrastructure complete: 6 tasks shipped in single session
-898 " ✅ Task queue evolved: Wiki V1 + accounting complete, next phase is corpus curation and validation
-899 1:01p 🔵 Next phase tasks planned: cost reporting + corpus curation for smoke testing
-900 " ⚖️ Three testing/reporting tasks claimed and dispatched
-901 " ⚖️ Corpus curation tasks dispatched: ALF and LAAI candidate selection
-902 " 🔵 Progress on cost report and corpus curation; JUNIOR hit permission check
-908 1:02p 🔵 JUNIOR scanning ALF and LAAI corpus; SENIOR building cost report script
-914 1:06p 🟣 Cost report script guides-0sq created and staged in git
-917 " 🟣 Cost accounting integration verified in guides/llm.py call_llm()
-918 1:07p 🔵 Deployment names configured in settings.py for cost tracking
-S386 Complete Wiki V1 pipeline infrastructure setup and preparation. Prepare clean environment for end-to-end pipeline test (guides-5ei). Monitor parallel agent execution (SENIOR Langfuse, JUNIOR pipeline test). (May 11 at 1:14 PM)
-S400 Monitor agents (SENIOR surface:23, JUNIOR surface:12) in workspace:5 every 2 minutes: detect "TASK N DONE" markers, close completed tasks via bd, dispatch next work from bd ready queue (May 11 at 1:15 PM)
-S401 Monitor two parallel agents (SENIOR/JUNIOR) every 2 minutes to manage Wiki V1 infrastructure completion: detect task completion markers, close finished tasks, and dispatch next work from task queue (May 11 at 1:16 PM)
-S402 Continuous /loop monitoring of two Claude agents (SENIOR/surface:23, JUNIOR/surface:12) in workspace:5 via cmux, dispatching tasks from bd queue every 2 minutes, detecting completion markers and managing task lifecycle (May 11 at 1:34 PM)
-S403 Monitor two Claude agents (SENIOR/surface:23, JUNIOR/surface:12) in workspace:5, dispatch Wiki V1 infrastructure tasks from bd queue every 2 minutes, detect completion markers, manage task lifecycle until pipeline finalization (May 11 at 1:34 PM)
-S404 Continue /loop monitoring of two agents (SENIOR/surface:23 patching wiki.py, JUNIOR/surface:12 validating source/output pairs). Maintain 2-minute polling interval, await task completion markers, dispatch next work items. (May 11 at 1:40 PM)
-S406 Set up multi-agent task supervision system with autonomous task distribution and monitoring loop between SENIOR and JUNIOR agents (May 11 at 1:41 PM)
-S407 Multi-agent task supervision: recovering SENIOR agent from Gemini API error, JUNIOR continues processing (May 11 at 2:05 PM)
-S408 Multi-agent task supervision: recover SENIOR from error, dispatch concurrent tasks, autonomous monitoring (May 11 at 2:05 PM)
-956 2:06p 🔵 SENIOR agent recovered from Gemini API error
-957 " 🟣 guides-9yn task dispatched to SENIOR: concurrent pipeline duplicate protection verification
-958 " 🔵 SENIOR: pytest dependency missing in project venv
-959 " 🔵 JUNIOR appears hung or unresponsive to input
-960 2:07p 🔵 Supervisor prompts JUNIOR for status/completion after hung state
-961 " 🔵 JUNIOR responsive: shows progress on ongoing task (~50% complete)
-962 " 🟣 SENIOR successfully ran pipeline lock test — test passed
-963 " 🟣 SENIOR analyzing and fixing redundant processing logic
-964 " 🟣 JUNIOR completed guides-e1s task — completion signal detected
-965 2:08p 🔵 guides-e1s closed successfully, task queue stalled on blocking dependencies
-966 " ✅ Supervisor notified JUNIOR: task queue blocked, agent to idle
-S409 Multi-agent task supervision: manage concurrent work on guides backlog, handle dependency blocking, autonomous agent monitoring (May 11 at 2:08 PM)
-**Investigated**: SENIOR: pipeline lock mechanism verification (test passed 1/1), redundant processing fix implementation. JUNIOR: URL extraction task from file contents (completed). Task queue state: blocked on dependencies. Agent error recovery: /clear context reset effectiveness.
+1074 2:50p ✅ Tasks claimed and URL test dispatched to JUNIOR
+1076 " ✅ Mixed file handling task dispatched to SENIOR
+1080 2:51p 🔵 SENIOR completed mixed file handling implementation
+1081 " 🔵 JUNIOR hit Azure API rate limit while processing URL
+1082 " ✅ guides-45u closed. Git shows 9-line mixed file handling implementation
+1083 " 🔵 Task queue shows blocking dependencies, no ready work available
+1085 " ✅ New task created: commit mixed-file code and audit wiki indexes
+1086 " ✅ Task guides-4rb claimed and dispatched to SENIOR for commit + index audit
+1087 2:52p 🔵 Pipeline processes Martin Fowler distributed systems article end-to-end
+1090 " 🔵 Wiki vault contains 10 extracted documents; 57 LLM calls logged with cost tracking
+1091 " ✅ Both remaining tasks closed: complete work cycle finished
+1092 " 🔵 needs_review.txt shows Settings validation failures in queue
+1093 " 🔵 Wiki extracts organized by content type: articles, githubs, notes, pdfs, youtubes
+1094 2:53p 🔵 Pipeline uses two-stage LLM processing per document: gpt-5.4 → gpt-5.4-mini
+1095 " ✅ Two new multi-format source tests created: GitHub and YouTube ingestion
+1096 " ✅ GitHub and YouTube ingestion tests dispatched to both agents
+1099 " 🔵 YouTube test incomplete: youtubes/ directory empty, no test file created
+1100 2:54p 🔵 SENIOR completed GitHub test: repo extraction and wiki generation successful
+S427 Monitor agent task execution and collect completion status; document progress on guides-y4y (P1 URL extraction fix) and JUNIOR recovery attempts (May 11 at 3:19 PM)
+S428 Continue monitoring guides-y4y task execution on SENIOR agent; track test-driven development progress for URL extraction fix (May 11 at 3:20 PM)
+S429 Recover guides-y4y task execution after Gemini API error; request SENIOR to continue work or report status (May 11 at 3:21 PM)
+S431 Plan next phase of development in guides project after completing 5 feature tasks and closing all open issues (May 11 at 3:22 PM)
+S432 Plan next phase of guides project development; clarify direction after completing 5 feature tasks (May 11 at 3:22 PM)
+S433 Continuous monitoring and planning status during agent infrastructure outage (May 11 at 3:36 PM)
+S434 Plan next development phase; awaiting user direction while agents remain non-functional (May 11 at 3:36 PM)
+S435 Plan and execute next development phase after completing 5 core features; agents non-functional, awaiting direction (May 11 at 3:37 PM)
+S436 Continue session after queue emptied; assess current status and plan next work (May 11 at 3:38 PM)
+1147 8:21p 🔵 Wiki extracts inventory and directory structure
+1149 8:22p 🔵 GitHub gist fetch failures in needs_review queue
+1150 " 🔵 Inbox queue state: one YouTube video processed
+S437 Assess queue state and identify next work: add new URLs, fix gist URL support, or other tasks (May 11 at 8:22 PM)
+1153 " 🔵 URL fetcher architecture: multi-strategy chain for content extraction
+1155 " 🔵 GitHub URL routing excludes gist URLs; root cause of fetch failures
+1156 " 🔵 Fetch module architecture: specialized handlers for source types
+1158 " 🔵 Cost tracking and LLM accounting system implemented
+1159 8:23p 🔵 Cost tracking integrated with Langfuse distributed tracing
+1160 " 🔵 All 13 wiki extracts have quality_score in frontmatter; 100% coverage
+1161 " 🔵 Pipeline logs structure and Azure OpenAI integration details
+1162 " 🔵 Processing high-complexity documents: Knowledge Unit specification ingestion
+1163 " 🔵 Pipeline log truncation issue: llm_call entries exist but grep output truncated
+1164 " 🔵 Complete LLM cost aggregation: 84 calls, $3.09 total cost across batch processing
+1165 " 🔵 Task-specific model routing: gpt-5.4-mini for classification, gpt-5.4 for synthesis
+1166 8:24p 🔵 Model routing architecture: call_smart vs call_fast with conditional deployment selection
+1167 " 🔵 Task-level deployment selection: tags.py uses fast, article.py uses smart
+1168 " 🔵 Hierarchical chunking for long-form content: 25k character chunks with merge pass
+1169 " ✅ Added GITHUB_GIST source type enum value
+1170 " ✅ Added gist URL detection to routing logic; now classifies gist.github.com URLs separately
+1171 8:25p 🟣 GitHub gist fetcher implemented: fetch_github_gist with multi-file formatting
+1172 " 🟣 Pipeline routing updated for GitHub gist support; gist URLs now processed end-to-end
+1173 " ✅ GitHub gist wiki classification updated: gists now treated as references, not articles
+1174 " ✅ YouTube chunking optimized for cost: per-chunk summaries now use fast model (gpt-5.4-mini)
+1175 " 🔵 Cost reporting CLI tool: scripts/cost_report.py aggregates LLM usage by model and date
+1176 8:26p 🔵 Cost report execution confirms end-to-end cost tracking: $3.09 for 84 LLM calls
+1177 " ✅ GitHub gist URL added to inbox queue; detection verified working
+1178 " 🔵 Missing dependency blocks queue execution: pydantic_settings not installed
+1179 " 🔵 Gist URL in queue but not yet processed; remains unparsed in inbox.txt
+1181 " 🔵 Queue processor is library module, not executable script; missing __main__ entry point
+1183 " 🟣 Gist URL processed via process_stream.py entry point; dedup check marked as already processed
+1185 8:27p 🔵 Previous gist processing failed with "gist_not_supported" error; old failure entry blocking reprocess
+1187 " 🔵 Gist URL failed silently on reprocess; no entry in sources directory
 
-**Learned**: Agent recovery pattern: context reset via /clear successful for protocol errors. Test validation via direct Python when pytest unavailable. Task completion signaling: agents write "TASK N DONE" marker. Queue blocking: dependent tasks cannot progress until prerequisites complete. Multi-agent concurrency: both agents work independently, supervisor coordinates via cmux surfaces and bd task system.
-
-**Completed**: JUNIOR completed guides-e1s task (URL extraction utility). Task closed in bd. SENIOR verified test_process_stream_lock.py passes (1 test, 0.001s). SENIOR reading code files (process_stream.py, validation logic). Supervisor recovered from Gemini API errors via context reset. Autonomous 2-minute monitoring loop active.
-
-**Next Steps**: SENIOR finalizing guides-9yn: complete redundant processing fix analysis and document findings. JUNIOR idle waiting for task queue unblock (blocked on dependency resolution). Supervisor checks both agents every 2 minutes (next at 14:11 UTC). Monitor for SENIOR completion signal "TASK guides-9yn DONE" and close task when ready.
-
-
-Access 211k tokens of past work via get_observations([IDs]) or mem-search skill.
+Access 219k tokens of past work via get_observations([IDs]) or mem-search skill.
 </claude-mem-context>

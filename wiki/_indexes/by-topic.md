@@ -46,6 +46,7 @@
 ## information-architecture
 - [[the-wiki-that-thinks-ingest-lint-llm-wiki]] - The Wiki That Thinks: ingest + lint + LLM Wiki
 ## knowledge-management
+- [[llm-wiki]] - LLM Wiki
 - [[the-wiki-that-thinks-ingest-lint-llm-wiki]] - The Wiki That Thinks: ingest + lint + LLM Wiki
 ## knowledge-retrieval
 - [[curated-context-engineering-vs-llm-wiki]] - Curated Context Engineering vs LLM Wiki
@@ -57,8 +58,12 @@
 - [[anthropic-sdk-python]] - anthropic-sdk-python
 ## llm-systems
 - [[the-wiki-that-thinks-ingest-lint-llm-wiki]] - The Wiki That Thinks: ingest + lint + LLM Wiki
+## llm-workflows
+- [[llm-wiki]] - LLM Wiki
 ## llmops
 - [[integrating-ai-evals-into-your-ai-app]] - Integrating AI Evals Into Your AI App
+## local-first
+- [[llm-wiki]] - LLM Wiki
 ## mcp-integration
 - [[protect-mcp]] - protect-mcp
 ## memory-systems
@@ -107,3 +112,5 @@
 - [[building-effective-agents]] - Building Effective Agents
 ## verification-protocols
 - [[formal-schema-for-verified-multi-model-knowledge]] - Formal schema for verified multi-model knowledge
+## wiki-architecture
+- [[llm-wiki]] - LLM Wiki

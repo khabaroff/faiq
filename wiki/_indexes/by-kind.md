@@ -11,6 +11,7 @@
 - [[integrating-ai-evals-into-your-ai-app]] - Integrating AI Evals Into Your AI App
 - [[the-wiki-that-thinks-ingest-lint-llm-wiki]] - The Wiki That Thinks: ingest + lint + LLM Wiki
 ## reference
+- [[llm-wiki]] - LLM Wiki
 - [[protect-mcp]] - protect-mcp
 - [[anthropic-sdk-python]] - anthropic-sdk-python
 ## youtube

@@ -1,7 +1,7 @@
 import hashlib
 
 from ..fetch.base import FetchedContent
-from ..llm import call_llm, get_smart_client, load_prompt
+from ..llm import call_llm, get_fast_client, get_smart_client, load_prompt
 from ..process.wiki import wrap_with_frontmatter
 from ..settings import Settings
 
@@ -17,11 +17,13 @@ def summarize_youtube(content: FetchedContent) -> str:
     if len(raw) <= CHUNK_SIZE:
         body = call_llm(client, settings.azure_deployment_smart, raw, system=prompt_template)
     else:
+        fast_client = get_fast_client()
+        fast_deployment = settings.azure_deployment_fast or settings.azure_deployment_smart
         chunks = [raw[i : i + CHUNK_SIZE] for i in range(0, len(raw), CHUNK_SIZE)]
         results = []
         for i, chunk in enumerate(chunks):
             header = f"[Part {i + 1}/{len(chunks)}]\n\n"
-            summary = call_llm(client, settings.azure_deployment_smart, header + chunk, system=prompt_template)
+            summary = call_llm(fast_client, fast_deployment, header + chunk, system=prompt_template)
             results.append(summary)
 
         body = "\n\n---\n\n".join(results)

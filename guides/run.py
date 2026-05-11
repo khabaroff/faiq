@@ -5,7 +5,7 @@ import uuid
 
 from guides.enrich.tags import extract_tags
 from guides.fetch.base import QueueItem, SourceKind, detect_source_type
-from guides.fetch.github import fetch_github_repo
+from guides.fetch.github import fetch_github_gist, fetch_github_repo
 from guides.fetch.pdf import fetch_pdf
 from guides.fetch.telegram import fetch_telegram
 from guides.fetch.url import fetch_url
@@ -43,6 +43,8 @@ def run_pipeline(item: QueueItem) -> dict:
                 fetched = fetch_url(item)
             elif source_type.value == "YOUTUBE":
                 fetched = fetch_youtube(item)
+            elif source_type.value == "GITHUB_GIST":
+                fetched = fetch_github_gist(item)
             else:
                 fetched = fetch_github_repo(item)
 
@@ -60,7 +62,7 @@ def run_pipeline(item: QueueItem) -> dict:
                 output_filename = "reference.md"
 
             taxonomy = extract_tags(strip_frontmatter(output_text))
-            if source_type.value == "GITHUB_REPO":
+            if source_type.value in ("GITHUB_REPO", "GITHUB_GIST"):
                 wiki_source_type = "reference"
             elif source_type.value == "YOUTUBE":
                 wiki_source_type = "youtube"

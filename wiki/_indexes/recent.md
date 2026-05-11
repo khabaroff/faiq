@@ -1,5 +1,6 @@
 # Recent
 ## 2026-05-11 | [[catalog-of-patterns-of-distributed-systems]] - Catalog of Patterns of Distributed Systems (article)
+## 2026-05-11 | [[llm-wiki]] - LLM Wiki (reference)
 ## 2026-05-11 | [[curated-context-engineering-vs-llm-wiki]] - Curated Context Engineering vs LLM Wiki (article)
 ## 2026-05-11 | [[demystifying-evals-for-ai-agents]] - Demystifying evals for AI agents (article)
 ## 2026-05-11 | [[how-to-implement-context-engineering-strategies-for-your-agent-claude-code]] - How to Implement Context Engineering Strategies for your Agent (Claude Code) (article)
