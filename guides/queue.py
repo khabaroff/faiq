@@ -162,6 +162,15 @@ def scan_inbox(inbox_dir: Path) -> list[QueueItem]:
                         )
                     continue
 
+                if classification == "mixed" and urls:
+                    for url in urls:
+                        if already_processed(url, settings.data_dir / "sources"):
+                            continue
+                        items.append(
+                            QueueItem(source=url, source_kind=SourceKind.URL, received_at=datetime.now(), origin="inbox")
+                        )
+                    # For 'mixed', we don't 'continue' - we also fall through to add the file itself
+
             items.append(QueueItem(source=source, source_kind=SourceKind.FILE, received_at=datetime.now(), origin="inbox"))
         except Exception as e:
             logger.warning("Error processing inbox file %s: %s", f.name, e)
