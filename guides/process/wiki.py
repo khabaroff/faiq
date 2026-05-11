@@ -80,9 +80,11 @@ def wrap_with_frontmatter(
     prompt_version: str | None = None,
     source_path: str = "",
 ) -> str:
-    title = _infer_title(body, source_url)
+    # Use source_path for title if source_url is empty (common for local files)
+    title = _infer_title(body, source_url or source_path)
     date_value = date or Date.today().isoformat()
-    h8 = hash8 or _compute_hash8(source_url)
+    # If source_url is empty, use source_path for hash calculation
+    h8 = hash8 or _compute_hash8(source_url or source_path)
     st_lower = source_type.lower()
 
     if st_lower in {"reference", "github_repo"}:
@@ -92,11 +94,15 @@ def wrap_with_frontmatter(
         page_id = f"src-{date_value}-{h8}"
         page_type = "source-page"
 
-    needs_review = st_lower in ("telegram", "pdf")
+    needs_review = st_lower in ("telegram", "pdf", "file", "article")
     status = "needs-review" if needs_review else "active"
 
     content_format = _map_content_format(st_lower)
     origin = _map_origin(st_lower)
+    
+    # Ensure origin is "file" for FILE sources if not already caught by _map_origin
+    if not source_url and source_path:
+        origin = "file"
 
     lines: list[str] = [
         "---",
@@ -110,7 +116,7 @@ def wrap_with_frontmatter(
         f'url: "{_quote(source_url)}"',
         f'created_at: "{date_value}"',
         f'updated_at: "{date_value}"',
-        'language: "en"',
+        'language: "ru"', # Default to Russian as per current extracting prompts
     ]
 
     if tags:
