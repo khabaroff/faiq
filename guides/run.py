@@ -60,7 +60,12 @@ def run_pipeline(item: QueueItem) -> dict:
                 output_filename = "reference.md"
 
             taxonomy = extract_tags(strip_frontmatter(output_text))
-            wiki_source_type = "reference" if source_type.value == "GITHUB_REPO" else "article"
+            if source_type.value == "GITHUB_REPO":
+                wiki_source_type = "reference"
+            elif source_type.value == "YOUTUBE":
+                wiki_source_type = "youtube"
+            else:
+                wiki_source_type = "article"
 
             is_file = item.source_kind == SourceKind.FILE
             source_url = "" if is_file else item.source

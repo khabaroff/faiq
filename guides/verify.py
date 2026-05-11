@@ -37,20 +37,28 @@ def _extract_tags_from_fm(fm: dict) -> list[str]:
     return parts
 
 
+_PLACEHOLDER_TITLES = {"title", "заголовок", "untitled", "название"}
+
+
 def verify_output(source_text: str, output_text: str, tags: list[str], source_type: str = "article") -> dict:
     checks: dict[str, bool] = {}
 
     checks["not_empty"] = len(output_text) > 100
-    checks["has_heading"] = any(line.startswith("#") for line in output_text.splitlines())
     checks["has_tags"] = bool(tags)
     checks["code_blocks_preserved"] = "```" not in source_text or "```" in output_text
 
     fm = _parse_frontmatter(output_text)
     required_keys = {"id", "title", "source_type", "status"}
     checks["has_frontmatter"] = bool(fm) and required_keys.issubset(fm.keys())
-    checks["valid_source_type"] = fm.get("source_type", "") in ("article", "reference", "note", "file")
+    checks["valid_source_type"] = fm.get("source_type", "") in ("article", "reference", "note", "file", "youtube", "github_repo")
 
-    if source_type == "article":
+    fm_title = fm.get("title", "") or ""
+    checks["no_placeholder_title"] = fm_title.lower().strip().strip('"') not in _PLACEHOLDER_TITLES
+
+    heading_lines = [l.strip() for l in output_text.splitlines() if l.strip().startswith("# ") and not l.strip().startswith("## ")]
+    checks["has_real_heading"] = bool(heading_lines) and heading_lines[0][2:].strip().lower() not in _PLACEHOLDER_TITLES
+
+    if source_type in ("article", "youtube"):
         checks["has_body_sections"] = (
             "## Краткое изложение" in output_text
             or "## Ключевые идеи" in output_text
@@ -63,7 +71,7 @@ def verify_output(source_text: str, output_text: str, tags: list[str], source_ty
             or "## Как использовать" in output_text
         )
     else:
-        checks["has_body_sections"] = False
+        checks["has_body_sections"] = True
 
     fm_tags = _extract_tags_from_fm(fm)
     checks["fm_tags"] = bool(fm_tags)

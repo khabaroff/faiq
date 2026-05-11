@@ -21,19 +21,24 @@ def fetch_youtube(item: QueueItem) -> FetchedContent:
 
 
 def _try_ytdlp(url: str) -> str | None:
-    try:
-        with tempfile.TemporaryDirectory() as tmpdir:
-            result = subprocess.run(
-                ["yt-dlp", "--write-auto-sub", "--sub-lang", "ru,en", "--skip-download", "--output", f"{tmpdir}/yt", url],
-                capture_output=True, text=True, timeout=120,
-            )
-            vtt_files = list(Path(tmpdir).glob("*.vtt"))
-            if not vtt_files:
-                return None
-            raw = vtt_files[0].read_text(encoding="utf-8")
-            return _parse_vtt(raw)
-    except Exception:
-        return None
+    for args in [
+        ["--write-auto-sub", "--sub-lang", "en"],
+        ["--write-auto-sub", "--sub-lang", "ru"],
+        ["--write-auto-sub", "--all-subs"],
+    ]:
+        try:
+            with tempfile.TemporaryDirectory() as tmpdir:
+                subprocess.run(
+                    ["yt-dlp"] + args + ["--skip-download", "--output", f"{tmpdir}/yt", url],
+                    capture_output=True, text=True, timeout=60,
+                )
+                vtt_files = list(Path(tmpdir).glob("*.vtt"))
+                if vtt_files:
+                    raw = vtt_files[0].read_text(encoding="utf-8")
+                    return _parse_vtt(raw)
+        except Exception:
+            continue
+    return None
 
 
 def _parse_vtt(vtt: str) -> str:
