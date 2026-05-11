@@ -37,8 +37,13 @@ def _extract_urls(text: str) -> list[str]:
     urls: list[str] = []
     seen: set[str] = set()
     for match in _URL_RE.findall(text):
-        url = match.rstrip(")].,;:!?'\"")
-        if url in seen:
+        url = match
+        while url and url[-1] in ")].,;:!?'\"":
+            if url[-1] == ")" and url.count("(") >= url.count(")"):
+                break
+            url = url[:-1]
+
+        if not url or url in seen:
             continue
         seen.add(url)
         urls.append(url)
