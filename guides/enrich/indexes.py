@@ -40,6 +40,11 @@ def _read_wiki_md_files(wiki_dir: Path) -> list[dict]:
             continue
 
         slug = fpath.stem
+        qs_raw = fm.get("quality_score")
+        try:
+            quality_score: float | None = float(qs_raw) if qs_raw not in (None, "null", "") else None
+        except (ValueError, TypeError):
+            quality_score = None
         entry = {
             "slug": slug,
             "title": fm.get("title", slug),
@@ -50,6 +55,7 @@ def _read_wiki_md_files(wiki_dir: Path) -> list[dict]:
             "review_required": str(fm.get("review_required", "false")).lower() == "true",
             "verified": str(fm.get("verified", "true")).lower() == "true",
             "topics": fm.get("topics", []) if isinstance(fm.get("topics"), list) else [],
+            "quality_score": quality_score,
         }
         entries.append(entry)
     return entries
@@ -72,11 +78,19 @@ def rebuild_indexes(wiki_dir: Path) -> None:
         lines.append(f"## {e['created_at']} | [[{e['slug']}]] - {e['title']} ({e['source_type']})\n")
     (indexes_dir / "recent.md").write_text("".join(lines), encoding="utf-8")
 
-    # 2) needs-review.md
-    flagged = [e for e in entries if e["review_required"] or not e["verified"] or e["status"] == "needs-review"]
+    # 2) needs-review.md — low quality_score (<0.7) or explicitly flagged
+    def _needs_review(e: dict) -> bool:
+        qs = e["quality_score"]
+        if qs is not None and qs < 0.7:
+            return True
+        return e["review_required"] or not e["verified"] or e["status"] == "needs-review"
+
+    flagged = sorted([e for e in entries if _needs_review(e)], key=lambda e: e.get("quality_score") or 1.0)
     lines = ["# Needs Review\n"]
     for e in flagged:
-        lines.append(f"## [[{e['slug']}]] - {e['title']} | {e['source_type']} | {e['status']}\n")
+        qs = e["quality_score"]
+        qs_str = f" quality_score: {qs:.2f}" if qs is not None else ""
+        lines.append(f"## {e['created_at']} | [[{e['slug']}]] - {e['title']} ({e['source_type']}){qs_str}\n")
     (indexes_dir / "needs-review.md").write_text("".join(lines), encoding="utf-8")
 
     # 3) githubs.md
