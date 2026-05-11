@@ -77,8 +77,8 @@ def extract_tags(text: str) -> dict[str, list[str]]:
 
     tags = _normalize_tags(parsed.get("tags", []))
     topics = _normalize_topics(parsed.get("topics", []))
-    entities = _normalize_entities(parsed.get("entities", []))
-    concepts = _normalize_concepts(parsed.get("concepts", []))
+    entities = _normalize_entities(parsed.get("entities", []))[:5]
+    concepts = _normalize_concepts(parsed.get("concepts", []))[:4]
 
     return {
         "tags": tags,
