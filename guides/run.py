@@ -11,6 +11,7 @@ from guides.fetch.url import fetch_url
 from guides.fetch.youtube import fetch_youtube
 from guides.process.article import rewrite_article
 from guides.process.reference import build_reference
+from guides.process.wiki import strip_frontmatter, wrap_with_frontmatter
 from guides.process.youtube import summarize_youtube
 from guides.settings import Settings
 from guides.verify import run_verify
@@ -54,14 +55,24 @@ def run_pipeline(item: QueueItem) -> dict:
             output_text = build_reference(fetched)
             output_filename = "reference.md"
 
-        tags = extract_tags(output_text)
-        status, checks = run_verify(fetched.raw_text, output_text, tags)
+        taxonomy = extract_tags(strip_frontmatter(output_text))
+        wiki_source_type = "reference" if source_type.value == "GITHUB_REPO" else "article"
+        output_text = wrap_with_frontmatter(
+            strip_frontmatter(output_text),
+            source_type=wiki_source_type,
+            source_url=item.source,
+            tags=taxonomy["tags"],
+            topics=taxonomy["topics"],
+            entities=taxonomy["entities"],
+            concepts=taxonomy["concepts"],
+        )
+        status, checks = run_verify(fetched.raw_text, output_text, taxonomy["tags"], source_type=wiki_source_type)
         vault_path = store(
             item.source,
             fetched.raw_text,
             output_text,
             output_filename,
-            tags,
+            taxonomy["tags"],
             source_type.value,
             status,
             data_dir=Settings().data_dir,
@@ -71,7 +82,7 @@ def run_pipeline(item: QueueItem) -> dict:
             "source": item.source,
             "source_type": source_type.value,
             "status": status,
-            "tags": tags,
+            "tags": taxonomy["tags"],
             "vault_path": str(vault_path),
         }
     except Exception as e:

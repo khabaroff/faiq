@@ -8,6 +8,22 @@ def _quote(value: str) -> str:
     return value.replace("\\", "\\\\").replace('"', '\\"')
 
 
+def strip_frontmatter(text: str) -> str:
+    stripped = text.lstrip()
+    if not stripped.startswith("---\n"):
+        return text.strip()
+
+    lines = stripped.splitlines()
+    end = None
+    for idx in range(1, len(lines)):
+        if lines[idx].strip() == "---":
+            end = idx
+            break
+    if end is None:
+        return text.strip()
+    return "\n".join(lines[end + 1 :]).strip()
+
+
 def _infer_title(body: str, source_url: str) -> str:
     for line in body.splitlines():
         stripped = line.strip()
@@ -25,6 +41,7 @@ def _compute_hash8(source_url: str) -> str:
 
 def _map_content_format(source_type: str) -> str:
     mapping = {
+        "reference": "reference",
         "youtube": "transcript",
         "youtube_video": "transcript",
         "github_repo": "reference",
@@ -34,6 +51,7 @@ def _map_content_format(source_type: str) -> str:
 
 def _map_origin(source_type: str) -> str:
     mapping = {
+        "reference": "github",
         "youtube": "youtube",
         "youtube_video": "youtube",
         "github_repo": "github",
@@ -54,6 +72,9 @@ def wrap_with_frontmatter(
     source_type: str,
     source_url: str,
     tags: list,
+    topics: list | None = None,
+    entities: list | None = None,
+    concepts: list | None = None,
     date: str | None = None,
     hash8: str | None = None,
     prompt_version: str | None = None,
@@ -64,7 +85,7 @@ def wrap_with_frontmatter(
     h8 = hash8 or _compute_hash8(source_url)
     st_lower = source_type.lower()
 
-    if st_lower == "github_repo":
+    if st_lower in {"reference", "github_repo"}:
         page_id = f"ref-{date_value}-{h8}"
         page_type = "reference-page"
     else:
@@ -98,19 +119,14 @@ def wrap_with_frontmatter(
     else:
         lines.append("tags: []")
 
-    lines.extend([
-        "topics: []",
-        "entities: []",
-        "concepts: []",
-        "related: []",
-        f"review_required: {_bool_str(needs_review)}",
-        "verified: false",
-        "quality_score: null",
-        "provenance:",
-        "  extracted: 0",
-        "  inferred: 0",
-        "  ambiguous: 0",
-    ])
+    for key, values in (("topics", topics), ("entities", entities), ("concepts", concepts)):
+        if values:
+            lines.append(f"{key}:")
+            lines.extend(f'  - "{_quote(str(value))}"' for value in values)
+        else:
+            lines.append(f"{key}: []")
+
+    lines.extend(["related: []", f"review_required: {_bool_str(needs_review)}", "verified: false", "quality_score: null", "provenance:", "  extracted: 0", "  inferred: 0", "  ambiguous: 0"])
 
     if source_path:
         lines.append(f'source_paths:\n  - "{_quote(source_path)}"')

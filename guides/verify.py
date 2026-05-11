@@ -2,7 +2,6 @@ import re
 
 
 def _parse_frontmatter(text: str) -> dict:
-    """Minimal frontmatter parser — regex only, no yaml."""
     if not text.startswith("---"):
         return {}
     end = text.find("---", 3)
@@ -10,11 +9,21 @@ def _parse_frontmatter(text: str) -> dict:
         return {}
     block = text[3:end]
     result: dict[str, object] = {}
+    current_key = None
     for line in block.splitlines():
+        list_item = re.match(r"^\s+-\s+(.*)", line)
+        if list_item and current_key:
+            val = list_item.group(1).strip().strip('"').strip("'")
+            if isinstance(result.get(current_key), list):
+                result[current_key].append(val)
+            else:
+                result[current_key] = [val]
+            continue
         m = re.match(r"^(\w+):\s*(.*)", line)
         if m:
+            current_key = m.group(1)
             val = m.group(2).strip().strip('"').strip("'")
-            result[m.group(1)] = val
+            result[current_key] = val if val else None
     return result
 
 
@@ -42,9 +51,17 @@ def verify_output(source_text: str, output_text: str, tags: list[str], source_ty
     checks["valid_source_type"] = fm.get("source_type", "") in ("article", "reference")
 
     if source_type == "article":
-        checks["has_body_sections"] = "## Summary" in output_text or "## Main Content" in output_text
+        checks["has_body_sections"] = (
+            "## Краткое изложение" in output_text
+            or "## Ключевые идеи" in output_text
+            or "## Детали" in output_text
+        )
     elif source_type == "reference":
-        checks["has_body_sections"] = "## Overview" in output_text
+        checks["has_body_sections"] = (
+            "## Назначение" in output_text
+            or "## Стек и зависимости" in output_text
+            or "## Как использовать" in output_text
+        )
     else:
         checks["has_body_sections"] = False
 
