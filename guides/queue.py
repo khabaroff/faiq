@@ -1,12 +1,16 @@
 import hashlib
 import logging
+import re
 from datetime import datetime
 from pathlib import Path
+from typing import Literal
 
 from guides.fetch.base import QueueItem, SourceKind
 from guides.settings import Settings
 
 logger = logging.getLogger(__name__)
+
+_URL_RE = re.compile(r"https?://\S+")
 
 
 def _is_valid_line(stripped: str) -> bool:
@@ -26,6 +30,44 @@ def _already_processed(source: str, sources_dir: Path) -> bool:
         if entry.is_dir() and hash8 in entry.name:
             return True
     return False
+
+
+def _extract_urls(text: str) -> list[str]:
+    urls: list[str] = []
+    seen: set[str] = set()
+    for match in _URL_RE.findall(text):
+        url = match.rstrip(")].,;:!?'\"")
+        if url in seen:
+            continue
+        seen.add(url)
+        urls.append(url)
+    return urls
+
+
+def _classify_text_file(text: str) -> Literal["single_url", "url_list", "mixed", "article"]:
+    stripped = text.strip()
+    if not stripped:
+        return "article"
+
+    urls = _extract_urls(text)
+    non_empty_lines = [line.strip() for line in text.splitlines() if line.strip()]
+
+    if len(urls) == 1 and _URL_RE.sub("", text).strip() == "":
+        return "single_url"
+
+    if len(urls) >= 3 and non_empty_lines:
+        url_lines = sum(1 for line in non_empty_lines if _URL_RE.search(line))
+        if url_lines / len(non_empty_lines) > 0.5:
+            return "url_list"
+
+    text_without_urls = _URL_RE.sub("", text)
+    text_chars = sum(1 for ch in text_without_urls if not ch.isspace())
+    url_chars = sum(len(url) for url in urls)
+
+    if urls and (len(non_empty_lines) >= 3 or text_chars >= 20):
+        return "mixed"
+
+    return "article"
 
 
 def pop_pending(queue_file: Path) -> list[QueueItem]:
@@ -74,5 +116,23 @@ def scan_inbox(inbox_dir: Path) -> list[QueueItem]:
         source = str(f)
         if _already_processed(source, settings.data_dir / "sources"):
             continue
+        if f.suffix.lower() in {".txt", ".md"}:
+            content = f.read_text(encoding="utf-8")
+            classification = _classify_text_file(content)
+            urls = _extract_urls(content)
+
+            if classification == "single_url" and urls:
+                items.append(
+                    QueueItem(source=urls[0], source_kind=SourceKind.URL, received_at=datetime.now(), origin="inbox")
+                )
+                continue
+
+            if classification == "url_list" and urls:
+                for url in urls:
+                    items.append(
+                        QueueItem(source=url, source_kind=SourceKind.URL, received_at=datetime.now(), origin="inbox")
+                    )
+                continue
+
         items.append(QueueItem(source=source, source_kind=SourceKind.FILE, received_at=datetime.now(), origin="inbox"))
     return items
