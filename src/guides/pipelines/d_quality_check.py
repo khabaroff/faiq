@@ -66,7 +66,7 @@ def call_llm_summary_check(source_text: str, summary_text: str, slug: str) -> di
     
     system = "Ты — эксперт по качеству технической документации. Твоя задача — проверить соответствие саммари исходному тексту. Верни только JSON."
     
-    response = call_llm(get_smart_client(), deployment, prompt, system)
+    response, _ = call_llm(get_smart_client(), deployment, prompt, system)
     return _extract_json(response)
 
 
@@ -80,7 +80,7 @@ def call_llm_wiki_clean(page_text: str, slug: str) -> dict:
     
     system = "Ты — редактор технической вики. Твоя задача — очистить страницу от дублей и битых ссылок. Верни только JSON."
     
-    response = call_llm(get_smart_client(), deployment, prompt, system)
+    response, _ = call_llm(get_smart_client(), deployment, prompt, system)
     return _extract_json(response)
 
 
