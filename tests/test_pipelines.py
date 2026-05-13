@@ -58,6 +58,17 @@ class PipelineBTests(unittest.TestCase):
                 out = b.summarize_one("s")
                 self.assertTrue(out.exists())
 
+    @patch("guides.pipelines.b_summarize.call_llm")
+    @patch("guides.pipelines.b_summarize.get_smart_client")
+    def test_call_llm_summary_retry(self, mock_client, mock_call):
+        mock_call.side_effect = [
+            ("Bad Response", Mock(prompt_tokens=1, completion_tokens=1, cost_usd=0)),
+            ("---\ntools: []\npatterns: []\n---\nGood", Mock(prompt_tokens=1, completion_tokens=1, cost_usd=0))
+        ]
+        res = b.call_llm_summary("s", "src", "u", "t", "ru")
+        self.assertIn("Good", res)
+        self.assertEqual(mock_call.call_count, 2)
+
 class PipelineCTests(unittest.TestCase):
     def test_slugify(self):
         self.assertEqual(c.slugify("Hello World"), "hello-world")
@@ -97,7 +108,7 @@ class PipelineCTests(unittest.TestCase):
             self.assertIn("# N", Path(tmp.name).read_text())
 
     @patch("guides.pipelines.c_wiki_update.call_llm_update")
-    def test_propagate_summary(self, mock_call):
+    def test_propagate_summary_rewrite_description(self, mock_call):
         from tempfile import TemporaryDirectory
         with TemporaryDirectory() as tmpdir:
             tp = Path(tmpdir)
@@ -111,8 +122,32 @@ class PipelineCTests(unittest.TestCase):
                  patch("guides.pipelines.c_wiki_update.WIKI_TOOLS_DIR", tools_dir), \
                  patch("guides.pipelines.c_wiki_update.WIKI_TECH_DIR", tech_dir):
                 (sum_dir / "s.md").write_text("---\ntools: [T]\n---\nB")
-                mock_call.return_value = {"action": "create", "page_md": "---\nname: T\n---\n# T"}
+                (tools_dir / "t.md").write_text("---\nname: T\n---\n# T\n\n## Что это\n\nOld")
+                mock_call.return_value = {
+                    "action": "rewrite_description",
+                    "page_md": "---\nname: T\n---\n# T\n\n## Что это\n\nNew\n\n## Упоминания\n\n- [s](../summaries/s.md)"
+                }
                 self.assertEqual(c.propagate_summary("s"), 1)
+                self.assertIn("New", (tools_dir / "t.md").read_text())
+
+    def test_canonicalize_slug_fuzzy(self):
+        # 85+ score token_sort_ratio
+        self.assertEqual(c.canonicalize_slug("Claude 3.5 Sonnet", ["claude-35-sonnet"]), "claude-35-sonnet")
+        self.assertEqual(c.canonicalize_slug("Brand New Tool", ["other"]), "brand-new-tool")
+
+    def test_extract_summary_fm_edge_cases(self):
+        self.assertEqual(c.extract_summary_fm("no fm"), ([], [], ""))
+        self.assertEqual(c.extract_summary_fm("---\ntools: [\"T1\"]\npatterns: [{\"name\": \"P1\"}]\nsource_url: u\n---\nBody"), (["T1"], ["P1"], "u"))
+
+    def test_backup_page(self):
+        from tempfile import TemporaryDirectory
+        with TemporaryDirectory() as tmpdir:
+            tp = Path(tmpdir)
+            p = tp / "page.md"
+            p.write_text("content")
+            c._backup_page(p)
+            self.assertTrue((tp / ".backups").exists())
+            self.assertEqual(len(list((tp / ".backups").glob("*.bak"))), 1)
 
 class PipelineETests(unittest.TestCase):
     def test_parse_front_matter_yaml(self):
@@ -124,7 +159,8 @@ class PipelineETests(unittest.TestCase):
 
     @patch("guides.pipelines.e_seo.load_prompt", return_value="{{title}} {{tldr}}")
     def test_render_seo_prompt(self, mock_load):
-        self.assertIn("T", e._render_seo_prompt({"title": "T"}, "## TL;DR\n\nTLDR"))
+        self.assertIn("T", e._render_seo_prompt({"title": "T"}, "## TL;DR\n\nTLDR text\n## Next"))
+        self.assertIn("TLDR text", e._render_seo_prompt({"title": "T"}, "## TL;DR\n\nTLDR text"))
 
     @patch("guides.pipelines.e_seo.call_llm_seo")
     @patch("guides.pipelines.e_seo.SUMMARIES_DIR")
@@ -180,9 +216,22 @@ class PipelineGTests(unittest.TestCase):
             (tp / "s.md").write_text("---\ntitle: T\n---\nB")
             self.assertTrue(g.publish_one("s", dry_run=False))
 
+    @patch("guides.pipelines.g_telegram.SUMMARIES_DIR")
+    @patch("guides.pipelines.g_telegram.get_state", return_value={})
+    @patch("guides.pipelines.g_telegram.publish_one", return_value=True)
+    def test_main(self, mock_pub, mock_state, mock_sum_dir):
+        from tempfile import TemporaryDirectory
+        with TemporaryDirectory() as tmpdir:
+            tp = Path(tmpdir)
+            mock_sum_dir.exists.return_value = True
+            mock_sum_dir.glob.return_value = [tp / "s.md"]
+            self.assertEqual(g.main(["--slug", "s"]), 0)
+
 class PipelineDTests(unittest.TestCase):
     def test_extract_json(self):
         self.assertEqual(d._extract_json("{\"a\":1}"), {"a": 1})
+        with self.assertRaises(ValueError):
+            d._extract_json("no json")
 
     @patch("guides.pipelines.d_quality_check.call_llm_summary_check")
     @patch("guides.pipelines.d_quality_check.SUMMARIES_DIR")
@@ -201,16 +250,31 @@ class PipelineDTests(unittest.TestCase):
     @patch("guides.pipelines.d_quality_check.call_llm_wiki_clean")
     @patch("guides.pipelines.d_quality_check.TOOLS_DIR")
     @patch("guides.pipelines.d_quality_check.TECH_DIR")
-    def test_clean_wiki_pages(self, mock_tech, mock_tools, mock_call):
+    def test_clean_wiki_pages_cleanup(self, mock_tech, mock_tools, mock_call):
         from tempfile import TemporaryDirectory
         with TemporaryDirectory() as tmpdir:
             tp = Path(tmpdir)
             mock_tools.glob.return_value = [tp / "t1.md"]
             mock_tech.glob.return_value = []
-            (tp / "t1.md").write_text("page")
-            mock_call.return_value = {"verdict": "ok"}
-            res = d.clean_wiki_pages()
-            self.assertEqual(len(res), 1)
+            p = tp / "t1.md"
+            p.write_text("page")
+            mock_call.return_value = {"verdict": "needs_cleanup", "cleaned_page_md": "clean"}
+            with patch("guides.pipelines.d_quality_check.ROOT", tp):
+                res = d.clean_wiki_pages()
+                self.assertEqual(res[0]["verdict"], "needs_cleanup")
+                self.assertEqual(p.read_text(), "clean")
+
+    @patch("guides.pipelines.d_quality_check.check_summaries", return_value=[{"slug": "s", "verdict": "ok"}])
+    @patch("guides.pipelines.d_quality_check.clean_wiki_pages", return_value=[])
+    @patch("guides.pipelines.d_quality_check.set_state")
+    @patch("guides.pipelines.d_quality_check.update_frontmatter")
+    @patch("guides.pipelines.d_quality_check.QC_REPORT")
+    @patch("guides.pipelines.d_quality_check.SUMMARIES_DIR")
+    def test_main(self, mock_sum_dir, mock_report, mock_fm, mock_state, mock_clean, mock_check):
+        mock_report.parent.mkdir.return_value = None
+        mock_sum_dir.__truediv__.side_effect = lambda x: Path(f"/tmp/{x}")
+        with patch.object(Path, "exists", return_value=True):
+            self.assertEqual(d.main(["--mode", "summary"]), 0)
 
 if __name__ == "__main__":
     unittest.main()
