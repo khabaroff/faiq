@@ -40,24 +40,34 @@ def main() -> int:
         try:
             from guides.pipelines import d_quality_check
             logger.info("=== Pipeline D: quality check ===")
-            d_quality_check.main([])
-        except (ImportError, NotImplementedError):
+            rc = d_quality_check.main([]) or 0
+            if rc:
+                logger.error("Pipeline D failed with code %s", rc)
+                return rc
+        except ImportError:
             logger.warning("Pipeline D not ready, skipping")
 
     logger.info("=== Pipeline E: SEO optimization ===")
     try:
         from guides.pipelines import e_seo
-        e_seo.main(["--force"] if args.force else [])
-    except (ImportError, Exception) as e:
-        logger.error("Pipeline E failed: %s", e)
+        rc = e_seo.main(["--force"] if args.force else []) or 0
+        if rc:
+            logger.error("Pipeline E failed with code %s", rc)
+            return rc
+    except ImportError as e:
+        logger.error("Pipeline E import failed: %s", e)
+        return 1
 
     logger.info("=== Pipeline G: Telegram publish ===")
     try:
         from guides.pipelines import g_telegram
-        # Telegram usually doesn't need --force as it depends on state[slug].published_telegram
-        g_telegram.main([])
-    except (ImportError, Exception) as e:
-        logger.error("Pipeline G failed: %s", e)
+        rc = g_telegram.main([]) or 0
+        if rc:
+            logger.error("Pipeline G failed with code %s", rc)
+            return rc
+    except ImportError as e:
+        logger.error("Pipeline G import failed: %s", e)
+        return 1
 
     logger.info("=== All done ===")
     return 0

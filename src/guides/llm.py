@@ -132,12 +132,12 @@ def call_llm_with_images(
     return _extract_response_text(response), usage
 
 
-def call_smart(prompt: str, system: str = "") -> str:
+def call_smart(prompt: str, system: str = "") -> tuple[str, UsageRecord]:
     s = _get_settings()
     return call_llm(_client(), s.azure_deployment_smart, prompt, system)
 
 
-def call_fast(prompt: str, system: str = "") -> str:
+def call_fast(prompt: str, system: str = "") -> tuple[str, UsageRecord]:
     s = _get_settings()
     deployment = s.azure_deployment_fast or s.azure_deployment_smart
     return call_llm(_client(), deployment, prompt, system)
