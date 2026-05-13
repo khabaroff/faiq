@@ -117,24 +117,25 @@ bd close <id>         # Complete work
 
 ```
 src/guides/           ← весь Python-код
-  pipelines/          ← a_ingest.py, b_summarize.py, c_wiki_update.py, d_quality_check.py
+  pipelines/          ← a_ingest, b_summarize, c_wiki_update, d_quality_check, e_seo, g_telegram
   fetch/              ← url.py, github.py, pdf.py, youtube.py
-  tools/              ← CLI-утилиты: fix_source_meta.py, daily_log.py, cost_report.py
+  tools/              ← build_indexes, cost_report, daily_log, link_checker, validate_wiki
 prompts/              ← LLM-промпты (summary.md, wiki_tool_update.md, seo.md, telegram_post.md)
 public/               ← Obsidian vault + Quartz output
   sources/            ← отформатированные исходники
   summaries/          ← русские саммари
   tools/              ← wiki-страницы инструментов
-  patterns/           ← wiki-страницы паттернов
+  patterns/           ← wiki-страницы паттернов (techniques)
+  index/              ← семантические индексы (tools, patterns, concepts...)
 data/inbox/           ← кидать сюда (файлы/URL-списки)
 data/inbox/done/      ← архив обработанных
-state/index.json      ← состояние пайплайна (не трогать)
+state/                ← SQLite БД (articles.db) и отчеты
 ```
 
 ### Running pipelines
 
 ```bash
-# полный цикл
+# полный цикл (A → B → C → D → E → G)
 python -m guides.pipelines.run_all
 
 # по одному
@@ -142,15 +143,15 @@ python -m guides.pipelines.a_ingest           # fetch → public/sources/
 python -m guides.pipelines.b_summarize        # summarize → public/summaries/
 python -m guides.pipelines.c_wiki_update      # tools/patterns wiki pages
 python -m guides.pipelines.d_quality_check    # hallucination/dedup check
-
-# с флагами
-python -m guides.pipelines.a_ingest --url https://...
-python -m guides.pipelines.b_summarize --batch 5
-python -m guides.pipelines.c_wiki_update --slug my-slug --force
+python -m guides.pipelines.e_seo              # SEO title/description
+python -m guides.pipelines.g_telegram         # post to Telegram channel
 
 # инструменты
-python -m guides.tools.fix_source_meta --dry-run   # починить метаданные sources
-python -m guides.tools.cost_report                  # отчёт по расходам
+python -m guides.tools.build_indexes          # собрать семантические индексы
+python -m guides.tools.cost_report            # отчёт по расходам
+python -m guides.tools.daily_log              # дневной лог операций
+python -m guides.tools.link_checker           # поиск битых ссылок
+python -m guides.tools.validate_wiki          # валидация формата страниц
 ```
 
 ### LLM routing
