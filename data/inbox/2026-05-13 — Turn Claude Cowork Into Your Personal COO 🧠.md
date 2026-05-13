@@ -1,11 +1,6 @@
----
-title: About Me
-slug: 2026-05-03-turn-claude-cowork-into
-source_url: https://linas.substack.com/p/claudecowork?r=llvd&utm_medium=ios&triedRedirect=true
-source_type: article
-fetched_at: 2026-05-13
-lang: en
----
+## 2026-05-13T13:23:05+04:00
+
+https://linas.substack.com/p/claudecowork?r=llvd&utm_medium=ios&triedRedirect=true
 
 👋 *Hey, Linas here! Welcome to another special issue of my daily newsletter. Each day, I focus on 3 stories that are making a difference in the financial technology space. Coupled with things worth watching & the most important money movements, it’s the only newsletter you need for all things when Finance meets Tech. If you’re reading this for the first time, it’s a brilliant opportunity to join a community of 370k+ FinTech leaders:*
 
@@ -28,12 +23,6 @@ All while you do something else.
 ## What Cowork Actually Is (And Why It’s Different From Everything Else)
 
 ![](https://substackcdn.com/image/fetch/$s_!quns!,w_1456,c_limit,f_webp,q_auto:good,fl_progressive:steep/https%3A%2F%2Fsubstack-post-media.s3.amazonaws.com%2Fpublic%2Fimages%2F52faeed0-f8cc-4833-b755-64cc713facb7_1000x563.webp)
-> **Image OCR (auto):**
-> **Type:** other
-> **Text:** CLAUDE
-> COWORK
-> **Description:** A simple logo-style graphic on a solid orange background. The words “CLAUDE” and “COWORK” appear on either side of a white angular emblem with a black connected-node line inside it. It looks like branding or a title card rather than a diagram or UI screenshot.
-
 
 Before the framework, let’s be precise about what we’re working with. Cowork is not Claude chat with extra features. It’s a fundamentally different category of tool.
 
@@ -44,23 +33,6 @@ Claude Cowork is an ***agentic AI***. You describe an outcome. Cowork makes a pl
 Cowork is built on the same agentic architecture as **Claude Code**, Anthropic’s terminal-based tool for developers. Where Claude Code gives an AI agent access to a codebase, Cowork gives it access to your work life. It runs inside the Claude Desktop app in a sandboxed virtual machine on your device. Your files stay local. Claude reads them, works on them, and writes outputs back to your folder.
 
 ![](https://substackcdn.com/image/fetch/$s_!OAWO!,w_1456,c_limit,f_webp,q_auto:good,fl_progressive:steep/https%3A%2F%2Fsubstack-post-media.s3.amazonaws.com%2Fpublic%2Fimages%2Fd1bb3124-6188-45e0-b6ed-8a6fceed1bfd_2476x842.png)
-> **Image OCR (auto):**
-> **Type:** ui-screenshot
-> **Text:** Chat
-> Cowork
-> Code
-> 
-> Let's knock something off your list
-> Cowork is an early research preview. New improvements ship frequently. Learn more or give us feedback.
-> 
-> How can I help you today?
-> 
-> Work in a folder
-> 
-> Opus 4.6
-> Let's go →
-> **Description:** A dark-themed AI app landing screen is shown with tabs for Chat, Cowork, and Code at the top. The center contains a large headline, a short preview notice, and a prompt box asking how it can help, with options to work in a folder, choose a model, and start with a “Let’s go” button.
-
 
 The key capabilities that make COO-level delegation possible:
 
@@ -71,126 +43,10 @@ The key capabilities that make COO-level delegation possible:
 → **Plugins.** Pre-built specialist packs that turn Claude from a generalist into a domain expert. Anthropic shipped 21 plugins covering Productivity, Marketing, Sales, Finance, Legal, Data Analysis, HR, Engineering, Design, Operations, and financial services verticals, including Investment Banking, Equity Research, Private Equity, and Wealth Management. Each plugin bundles skills, slash commands, connectors, and sub-agents tuned to a specific function.
 
 ![](https://substackcdn.com/image/fetch/$s_!lSuu!,w_1456,c_limit,f_webp,q_auto:good,fl_progressive:steep/https%3A%2F%2Fsubstack-post-media.s3.amazonaws.com%2Fpublic%2Fimages%2F1a877214-096c-4d07-9d59-8257420e60fd_2020x1084.png)
-> **Image OCR (auto):**
-> **Type:** ui-screenshot
-> **Text:** Browse plugins
-> Extend how Claude performs tasks with ready-to-use workflows. Customize plugins for your company's tools, data, and best practices.
-> 
-> By Anthropic & Partners    Personal
-> 
-> Search
-> 
-> Manage
-> 
-> Legal    v1.1.0
-> Speed up contract review, NDA triage, and
-> compliance workflows for in-house legal teams.
-> Draft legal briefs, organize precedent research,
-> and manage institutional knowledge.
-> 
-> Productivity
-> Manage tasks, plan your day, and build up
-> memory of important context about your work.
-> Syncs with your calendar, email, and chat to keep
-> everything organized and on track.
-> 
-> Enterprise search
-> Search across all of your company's tools in one
-> place. Find anything across email, chat,
-> documents, and wikis without switching between
-> apps.
-> 
-> Sales
-> Prospect, craft outreach, and build deal strategy
-> faster. Prep for calls, manage your pipeline, and
-> write personalized messaging that moves deals
-> forward.
-> 
-> Finance
-> Streamline finance and accounting workflows,
-> from journal entries and reconciliation to financial
-> statements and variance analysis. Speed up audit
-> prep, month-end close, and keeping your books...
-> 
-> Data
-> Write SQL, explore datasets, and generate
-> insights faster. Build visualizations and
-> dashboards, and turn raw data into clear stories
-> for stakeholders.
-> **Description:** This is a dark-themed plugin browser modal for Claude showing available plugins by Anthropic and partners. It includes a search field, tabs for plugin categories, and a grid of plugin cards such as Legal, Productivity, Enterprise search, Sales, Finance, and Data. Each card has an icon, title, and short description, with a Manage button on the Legal card.
-
 
 → **Connectors.** Live integrations with Slack, Google Drive, Gmail, Notion, Asana, Linear, Jira, HubSpot, Figma, Snowflake, FactSet, and 50+ other tools via the Model Context Protocol. Once connected, Claude pulls live data from these services mid-task. No copy-pasting. No screenshots. No downloads.
 
 ![](https://substackcdn.com/image/fetch/$s_!G-6u!,w_1456,c_limit,f_webp,q_auto:good,fl_progressive:steep/https%3A%2F%2Fsubstack-post-media.s3.amazonaws.com%2Fpublic%2Fimages%2Faeb5d7ec-a6ab-4f00-b34e-d4862155b965_3180x1650.png)
-> **Image OCR (auto):**
-> **Type:** ui-screenshot
-> **Text:** Claude
-> Meet Claude
-> Platform
-> Solutions
-> Pricing
-> Resources
-> Login
-> Contact sales
-> Try Claude
-> Connectors
-> Explore here
-> Browse connectors
-> Search connectors
-> Filter
-> Works with
-> Use case
-> Capabilities
-> Submit your own connector
-> New connectors help expand
-> what Claude can do for
-> everyone. Share yours and we’ll
-> review it for the directory.
-> Get started
-> 10x Genomics Cloud
-> Interact with 10x Genomics
-> Cloud platform
-> ActiveCampaign
-> Autonomous marketing to transform how
-> you work
-> Ahrefs
-> SEO & AI search analytics
-> Aiera
-> Live events, filings, company
-> publications, and more
-> AirOps
-> Craft content that wins AI search
-> Airtable
-> Bring your structured data to Claude
-> Airwallex
-> Integrate with the Airwallex Platform
-> using Claude
-> Amplitude
-> Give your teams powerful
-> behavioral insights
-> Apollo.io
-> Find buyers. Book more meetings. Close
-> more deals.
-> Asana
-> Connect to Asana to coordinate tasks,
-> projects, and goals
-> Atlassian Rovo
-> Access Jira & Confluence from Claude
-> Attio
-> Search, manage, and update your Attio
-> CRM from Claude
-> Aura
-> Company intelligence &
-> workforce analytics
-> AWS Marketplace
-> Discover, evaluate, and buy solutions for
-> the cloud
-> Benchling
-> Connect to R&D data, source
-> experiments, and notebooks
-> **Description:** A dark-themed Claude web page showing the Connectors directory. The main area contains a searchable grid of connector cards with app logos, names, and short descriptions, while a left sidebar provides filter sections and a submission callout. The top navigation includes links like Meet Claude, Platform, Solutions, Pricing, Resources, Login, and buttons for Contact sales and Try Claude.
-
 
 → **Instructions.** Standing directives that load automatically at the start of every session. Global instructions apply everywhere. Folder-specific instructions activate per project. With these set properly, Claude starts every session already knowing your name, your role, your communication preferences, and your working style.
 
@@ -363,11 +219,3 @@ Cowork is still a research preview. Knowing the limitations protects you from wa
 - **Desktop only.** No mobile. No browser version. No syncing between devices. If you work across machines, put your workspace in a cloud-synced folder so at least your files stay consistent.
 - **Browser automation is inconsistent.** The Claude in Chrome extension works well for trusted sites and structured data extraction. It struggles with complex multi-step browser workflows, pages that load dynamically, and sites that block automation. If Claude gets stuck, tell it to skip that step.
 - **Still a research preview.** Anthropic is explicit that agent safety is under active development. Treat it accordingly. Enable deletion protection. Review plans before execution. Don’t run it on files you can’t afford to have modified without confirmation.
-
-## 10 Prompts That Turn Cowork Into Your Personal COO
-
-Every prompt below is fully engineered. XML tags for structure. Phased methodology. Explicit constraints. Defined output formats. Anti-patterns blocked. Each one is designed to hand Cowork a complete job and walk away.
-
-Before running any of these: point Cowork at the right folder. Every prompt assumes Cowork has access to a folder with relevant files. The more useful context you have in that folder - past documents, brand guidelines, data exports, notes, context files - the better the output.
-
-To make Claude even more powerful, I’m also sharing an end-to-end guide on [how to productize yourself (or the best startup strategy for 2026)](https://linas.substack.com/p/productizeyourself), and [how I built an AI operating system to run a startup with Claude](https://linas.substack.com/p/onepersonunicorn). It has everything you need to build the one-person unicorn 🦄

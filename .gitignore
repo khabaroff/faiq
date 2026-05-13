@@ -13,3 +13,5 @@ wiki/extracts/
 wiki/log.md
 uv.lock
 data/inbox/_assets/
+.DS_Store
+**/.DS_Store

@@ -1,11 +1,6 @@
----
-title: Curated Context Engineering VS LLM Wiki Two Approaches To Knowledge
-slug: 2026-04-12-curated-context-engineering-vs-llm-wiki_-two-approaches-to-knowledge-
-source_url: https://agentarchitectures.substack.com/p/curated-context-engineering-vs-llm-wiki
-source_type: article
-fetched_at: 2026-05-13
-lang: en
----
+## 2026-05-13T13:18:53+04:00
+
+https://agentarchitectures.substack.com/p/curated-context-engineering-vs-llm-wiki
 
 ## Abstract
 

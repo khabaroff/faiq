@@ -1,11 +1,6 @@
----
-title: Open my-wiki/ in Obsidian
-slug: 2026-04-28-obsidian-ai-second-brain_-the-open-source-plugin-that-organizes-itsel
-source_url: https://agricidaniel.com/blog/claude-obsidian-ai-second-brain
-source_type: article
-fetched_at: 2026-05-13
-lang: en
----
+## 2026-05-13T13:21:16+04:00
+
+https://agricidaniel.com/blog/claude-obsidian-ai-second-brain
 
 ![Cover image for I Turned Obsidian Into a Self-Organizing AI Brain  -  Here's the Open-Source Plugin](https://agricidaniel.com/images/blog/claude-obsidian-cover.webp)
 
