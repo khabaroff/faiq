@@ -20,6 +20,7 @@ from typing import Callable, Literal
 from pydantic import BaseModel
 
 from guides.llm import call_smart_with_images, estimate_cost, extract_usage, record_to_log_extra
+from guides.security.url_safety import validate_url
 from guides.settings import Settings
 
 settings = Settings()
@@ -114,6 +115,7 @@ def discover_markdown_files(paths: list[Path]) -> list[Path]:
 
 
 def _download_url(url: str) -> tuple[bytes, str]:
+    validate_url(url)
     req = urllib.request.Request(url, headers={"User-Agent": "guides-ocr-images/1.0"})
     last_exc: Exception | None = None
     for attempt in range(1, MAX_RETRIES + 1):
