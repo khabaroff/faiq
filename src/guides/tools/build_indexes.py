@@ -14,6 +14,8 @@ from pathlib import Path
 
 import yaml
 
+from guides.atomic_write import atomic_write_text
+
 logger = logging.getLogger(__name__)
 
 ROOT = Path(__file__).resolve().parent.parent.parent.parent
@@ -118,7 +120,7 @@ def main(argv: list[str] | None = None) -> int:
             lines.append("")
 
         out_path = index_dir / filename
-        out_path.write_text("\n".join(lines), encoding="utf-8")
+        atomic_write_text(out_path, "\n".join(lines))
         logger.info(f"Generated {out_path} with {len(data_map)} entries")
 
     write_index(data_maps["tools"], "tools.md", "Tools Index", tools_dir, "tools")

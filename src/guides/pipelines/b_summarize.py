@@ -29,8 +29,9 @@ from pathlib import Path
 
 import yaml
 
+from guides.atomic_write import atomic_write_text
 from guides.frontmatter import parse_frontmatter
-from guides.llm import call_llm, get_smart_client, load_prompt, count_tokens
+from guides.llm import call_llm, count_tokens, get_smart_client, load_prompt
 from guides.settings import Settings
 from guides.tools.daily_log import append_log_entry
 
@@ -59,15 +60,6 @@ _CORRECTION = (
     "---\n"
     "Ключи tools и patterns ОБЯЗАТЕЛЬНЫ (пустые списки если нет). Повтори весь ответ."
 )
-
-def count_tokens(text: str) -> int:
-    try:
-        import tiktoken
-        enc = tiktoken.get_encoding("cl100k_base")
-        return len(enc.encode(text))
-    except Exception:
-        return len(text) // 2
-
 
 def parse_front_matter_simple(text: str) -> tuple[dict, str]:
     """Simple key: value parser (no lists). For source files."""
@@ -186,7 +178,7 @@ def summarize_one(slug: str) -> Path:
 
     out = SUMMARIES_DIR / f"{slug}.md"
     out.parent.mkdir(parents=True, exist_ok=True)
-    out.write_text(fm_str + llm_body)
+    atomic_write_text(out, fm_str + llm_body)
     return out
 
 

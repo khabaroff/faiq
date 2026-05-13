@@ -34,6 +34,7 @@ from pathlib import Path
 
 import yaml
 
+from guides.atomic_write import atomic_write_text
 from guides.frontmatter import parse_frontmatter
 from guides.llm import call_llm, get_smart_client, load_prompt
 from guides.models import WikiUpdateResponse
@@ -186,7 +187,7 @@ def write_wiki_page(page_path: Path, name: str, slug: str, item_type: str, url: 
         body += "\n"
 
     page_path.parent.mkdir(parents=True, exist_ok=True)
-    page_path.write_text(front_matter + body)
+    atomic_write_text(page_path, front_matter + body)
 
 
 def append_mention_to_page(page_path: Path, new_mention: dict) -> None:
@@ -226,7 +227,7 @@ def append_mention_to_page(page_path: Path, new_mention: dict) -> None:
         front_matter += f"{k}: {v}\n"
     front_matter += "---\n\n"
 
-    page_path.write_text(front_matter + body)
+    atomic_write_text(page_path, front_matter + body)
 
 
 def propagate_summary(slug: str, force: bool = False) -> int:
@@ -292,7 +293,7 @@ def propagate_summary(slug: str, force: bool = False) -> int:
             if action == "create" or not page_path.exists():
                 if page_md:
                     page_path.parent.mkdir(parents=True, exist_ok=True)
-                    page_path.write_text(page_md)
+                    atomic_write_text(page_path, page_md)
                 else:
                     write_wiki_page(page_path, name, page_slug, kind, source_url, new_mention.get("role_in_article", ""), [new_mention])
             elif action == "append_mention":
@@ -314,7 +315,7 @@ def propagate_summary(slug: str, force: bool = False) -> int:
             else:
                 if page_md:
                     page_path.parent.mkdir(parents=True, exist_ok=True)
-                    page_path.write_text(page_md)
+                    atomic_write_text(page_path, page_md)
 
             print(f"  {action:>20s}: {page_path}")
             processed += 1

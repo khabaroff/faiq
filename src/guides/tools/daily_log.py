@@ -3,6 +3,8 @@
 from datetime import datetime
 from pathlib import Path
 
+from guides.atomic_write import atomic_write_text
+
 
 def _get_log_path() -> Path:
     now = datetime.now()
@@ -33,7 +35,7 @@ def append_log_entry(
 | slug | action | model | tokens | cost | time |
 | ---- | ------ | ----- | ------ | ---- | ---- |
 """
-        log_path.write_text(header, encoding="utf-8")
+        atomic_write_text(log_path, header)
 
     existing = log_path.read_text(encoding="utf-8")
 
@@ -63,4 +65,4 @@ def append_log_entry(
         lines.append(total_line)
         lines.append(table_row)
 
-    log_path.write_text("\n".join(lines) + "\n", encoding="utf-8")
+    atomic_write_text(log_path, "\n".join(lines) + "\n")

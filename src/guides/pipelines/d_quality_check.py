@@ -18,6 +18,7 @@ import sys
 from datetime import date
 from pathlib import Path
 
+from guides.atomic_write import atomic_write_text
 from guides.llm import call_llm, get_smart_client, load_prompt
 from guides.models import SummaryCheckResponse, WikiCleanResponse
 from guides.settings import Settings
@@ -143,7 +144,7 @@ def clean_wiki_pages(slug_filter: str | None = None) -> list[dict]:
             if res.get("verdict") == "needs_cleanup" and "cleaned_page_md" in res:
                 content = res["cleaned_page_md"]
                 content = re.sub(r'<[^>]+>', '', content)
-                page.write_text(content, encoding="utf-8")
+                atomic_write_text(page, content)
                 print(f"  -> Cleaned: {slug}")
 
             results.append(res)
@@ -193,7 +194,7 @@ def main(argv=None) -> int:
                 update_frontmatter(summary_path, {"status": "quality_ok" if res.get("verdict") == "ok" else "quality_needs_review"})
 
     QC_REPORT.parent.mkdir(parents=True, exist_ok=True)
-    QC_REPORT.write_text(json.dumps({
+    atomic_write_text(QC_REPORT, json.dumps({
         "ts": date.today().isoformat(),
         "results": all_results,
     }, ensure_ascii=False, indent=2), encoding="utf-8")

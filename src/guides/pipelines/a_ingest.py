@@ -21,6 +21,7 @@ import sys
 from datetime import datetime
 from pathlib import Path
 
+from guides.atomic_write import atomic_write_text
 from guides.fetch.base import QueueItem, SourceKind, SourceType, detect_source_type
 from guides.fetch.github import fetch_github_gist, fetch_github_repo
 from guides.fetch.image_ocr import process_markdown_file
@@ -131,7 +132,7 @@ def _process_image(item: QueueItem, settings: Settings) -> dict | None:
         body += f"## Extracted Text\n\n{extracted_text}\n"
 
     out_path = images_dir / f"{slug}.md"
-    out_path.write_text(frontmatter + body, encoding="utf-8")
+    atomic_write_text(out_path, frontmatter + body)
 
     _archive_file(image_path, settings.inbox_dir / "done")
     return {"slug": slug, "source_type": "image", "path": out_path, "content_hash": None}
@@ -188,7 +189,7 @@ def process_item(item: QueueItem, settings: Settings) -> dict | None:
         out_path = safe_join(content_sources_dir, f"{slug}.md")
 
         # Initial write
-        out_path.write_text(fetched.raw_text, encoding="utf-8")
+        atomic_write_text(out_path, fetched.raw_text)
 
         # 4. OCR images (only for articles/gists, repos usually have internal images)
         if actual_type in ("article", "gist"):
@@ -225,7 +226,7 @@ def process_item(item: QueueItem, settings: Settings) -> dict | None:
             "status": "draft",
         }
         yaml_block = "---\n" + "\n".join(f"{k}: {v}" for k, v in frontmatter.items()) + "\n---\n\n"
-        out_path.write_text(yaml_block + raw_content, encoding="utf-8")
+        atomic_write_text(out_path, yaml_block + raw_content)
 
         # 6. Archive
         if item.source_kind == SourceKind.FILE:

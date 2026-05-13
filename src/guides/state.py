@@ -9,6 +9,8 @@ from typing import Any
 
 import yaml
 
+from guides.atomic_write import atomic_write_text
+
 ROOT = Path(__file__).resolve().parent.parent.parent
 STATE_DIR = ROOT / "state"
 DB_PATH = STATE_DIR / "articles.db"
@@ -193,7 +195,7 @@ def update_frontmatter(filepath: Path, updates: dict) -> None:
      text = filepath.read_text(encoding="utf-8")
      if not text.startswith("---"):
          fm_str = "---\n" + yaml.safe_dump(updates, allow_unicode=True, default_flow_style=False) + "---\n\n"
-         filepath.write_text(fm_str + text)
+         atomic_write_text(filepath, fm_str + text)
          return
 
      end = text.index("\n---\n", 4)
@@ -204,7 +206,7 @@ def update_frontmatter(filepath: Path, updates: dict) -> None:
          fm = {}
      fm.update(updates)
      new_fm = yaml.safe_dump(fm, default_flow_style=False, allow_unicode=True, sort_keys=False)
-     filepath.write_text(f"---\n{new_fm}---\n{body}")
+     atomic_write_text(filepath, f"---\n{new_fm}---\n{body}")
 
 
 def set_status(slug: str, filepath: Path | None, status: str,
@@ -242,4 +244,4 @@ def load_state_json() -> dict:
 
 def save_state_json(state: dict) -> None:
     STATE_DIR.mkdir(parents=True, exist_ok=True)
-    JSON_STATE.write_text(json.dumps(state, ensure_ascii=False, indent=2))
+    atomic_write_text(JSON_STATE, json.dumps(state, ensure_ascii=False, indent=2))
