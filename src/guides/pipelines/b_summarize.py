@@ -23,13 +23,20 @@ import argparse
 import re
 import sys
 from datetime import date
+from functools import cache as _cache
 from pathlib import Path
 
 import yaml
 
+from guides.frontmatter import parse_frontmatter
 from guides.llm import call_llm, get_smart_client, load_prompt
 from guides.settings import Settings
 from guides.tools.daily_log import append_log_entry
+
+
+@_cache
+def _s() -> "Settings":
+    return Settings()
 
 ROOT = Path(__file__).resolve().parent.parent.parent.parent
 CONTENT_DIR = ROOT / "public"
@@ -50,9 +57,6 @@ _CORRECTION = (
     "---\n"
     "Ключи tools и patterns ОБЯЗАТЕЛЬНЫ (пустые списки если нет). Повтори весь ответ."
 )
-
-s = Settings()
-
 
 def count_tokens(text: str) -> int:
     return len(text) // 4
@@ -76,30 +80,12 @@ def parse_front_matter_simple(text: str) -> tuple[dict, str]:
     return fm, body
 
 
-def parse_front_matter_yaml(text: str) -> tuple[dict, str] | None:
-    """YAML-aware parser. Returns (fm, body) or None on parse failure."""
-    if not text.startswith("---\n"):
-        return None
-    try:
-        end = text.index("\n---\n", 4)
-    except ValueError:
-        return None
-    fm_raw = text[4:end]
-    body = text[end + 5:]
-    try:
-        fm = yaml.safe_load(fm_raw) or {}
-        if not isinstance(fm, dict):
-            return None
-        return fm, body
-    except yaml.YAMLError:
-        return None
-
-
 def _validate_summary_md(text: str) -> bool:
-    result = parse_front_matter_yaml(text)
-    if result is None:
+    if not text.startswith("---\n"):
         return False
-    fm, _ = result
+    fm, _ = parse_frontmatter(text)
+    if not fm:
+        return False
     return isinstance(fm.get("tools"), list) and isinstance(fm.get("patterns"), list)
 
 
@@ -117,9 +103,9 @@ def call_llm_summary(slug: str, source_text: str, source_url: str, source_type: 
     base_prompt = _render_summary_prompt(source_text, source_url, source_type, lang_orig)
 
     token_count = count_tokens(source_text)
-    deployment = s.azure_deployment_fast or s.azure_deployment_smart
+    deployment = _s().azure_deployment_fast or _s().azure_deployment_smart
     if token_count >= 15000:
-        deployment = s.azure_deployment_smart
+        deployment = _s().azure_deployment_smart
 
     system = (
         "Ты — экспертный ассистент для анализа технических статей. "
@@ -171,11 +157,7 @@ def summarize_one(slug: str) -> Path:
         lang_orig=src_fm.get("lang", "ru"),
     )
 
-    result = parse_front_matter_yaml(summary_md)
-    if result is None:
-        llm_fm, llm_body = {}, summary_md
-    else:
-        llm_fm, llm_body = result
+    llm_fm, llm_body = parse_frontmatter(summary_md)
 
     today = date.today().isoformat()
 

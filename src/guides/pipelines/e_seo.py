@@ -14,10 +14,12 @@ import logging
 import re
 import sys
 from datetime import date
+from functools import cache as _cache
 from pathlib import Path
 
 import yaml
 
+from guides.frontmatter import parse_frontmatter
 from guides.llm import call_llm, get_smart_client, load_prompt
 from guides.settings import Settings
 from guides.state import get_state, set_state, update_frontmatter
@@ -29,26 +31,10 @@ CONTENT_DIR = ROOT / "public"
 SUMMARIES_DIR = CONTENT_DIR / "summaries"
 SOURCES_DIR = CONTENT_DIR / "sources"
 
-s = Settings()
 
-
-def parse_front_matter_yaml(text: str) -> tuple[dict, str]:
-    """YAML-aware parser. Returns (fm, body)."""
-    if not text.startswith("---\n"):
-        return {}, text
-    try:
-        end = text.index("\n---\n", 4)
-    except ValueError:
-        return {}, text
-    fm_raw = text[4:end]
-    body = text[end + 5:]
-    try:
-        fm = yaml.safe_load(fm_raw) or {}
-        if not isinstance(fm, dict):
-            fm = {}
-        return fm, body
-    except yaml.YAMLError:
-        return {}, text
+@_cache
+def _s() -> "Settings":
+    return Settings()
 
 
 def _extract_json(text: str) -> dict:
@@ -81,7 +67,7 @@ def _render_seo_prompt(fm: dict, body: str) -> str:
 def call_llm_seo(fm: dict, body: str) -> dict:
     prompt = _render_seo_prompt(fm, body)
 
-    deployment = s.azure_deployment_fast or s.azure_deployment_smart
+    deployment = _s().azure_deployment_fast or _s().azure_deployment_smart
     system = "You are a technical SEO expert. Return only valid JSON as requested. No prose."
 
     response, _ = call_llm(get_smart_client(), deployment, prompt, system)
@@ -94,13 +80,13 @@ def optimize_one(slug: str) -> bool:
         return False
 
     text = summary_path.read_text(encoding="utf-8")
-    fm, body = parse_front_matter_yaml(text)
+    fm, body = parse_frontmatter(text)
 
     # Try to get title from source if not in summary fm
     if not fm.get("title"):
         source_path = SOURCES_DIR / f"{slug}.md"
         if source_path.exists():
-            src_fm, _ = parse_front_matter_yaml(source_path.read_text(encoding="utf-8"))
+            src_fm, _ = parse_frontmatter(source_path.read_text(encoding="utf-8"))
             fm["title"] = src_fm.get("title")
 
     print(f"Optimizing SEO for: {slug}...")

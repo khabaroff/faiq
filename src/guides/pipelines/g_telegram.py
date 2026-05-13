@@ -14,11 +14,13 @@ import logging
 import re
 import sys
 from datetime import datetime
+from functools import cache as _cache
 from pathlib import Path
 
 import httpx
 import yaml
 
+from guides.frontmatter import parse_frontmatter
 from guides.llm import call_llm, get_smart_client, load_prompt
 from guides.settings import Settings
 from guides.state import get_state, set_state, update_frontmatter
@@ -29,25 +31,11 @@ ROOT = Path(__file__).resolve().parent.parent.parent.parent
 CONTENT_DIR = ROOT / "public"
 SUMMARIES_DIR = CONTENT_DIR / "summaries"
 
-s = Settings()
 
-def parse_front_matter_yaml(text: str) -> tuple[dict, str]:
-    """YAML-aware parser. Returns (fm, body)."""
-    if not text.startswith("---\n"):
-        return {}, text
-    try:
-        end = text.index("\n---\n", 4)
-    except ValueError:
-        return {}, text
-    fm_raw = text[4:end]
-    body = text[end + 5:]
-    try:
-        fm = yaml.safe_load(fm_raw) or {}
-        if not isinstance(fm, dict):
-            fm = {}
-        return fm, body
-    except yaml.YAMLError:
-        return {}, text
+@_cache
+def _s() -> "Settings":
+    return Settings()
+
 
 def _render_telegram_prompt(fm: dict) -> str:
     prompt_template = load_prompt("telegram_post.md")
@@ -69,7 +57,7 @@ def _render_telegram_prompt(fm: dict) -> str:
 def call_llm_telegram(fm: dict) -> str:
     prompt = _render_telegram_prompt(fm)
 
-    deployment = s.azure_deployment_fast or s.azure_deployment_smart
+    deployment = _s().azure_deployment_fast or _s().azure_deployment_smart
     system = "You are a social media manager for a technical AI channel. Write a concise and engaging Telegram post. Follow the format exactly."
 
     response, _ = call_llm(get_smart_client(), deployment, prompt, system)
@@ -82,13 +70,13 @@ def _escape_markdown_v2(text: str) -> str:
     return re.sub(r'([' + re.escape(special) + r'])', r'\\\1', text)
 
 def send_telegram_message(text: str) -> bool:
-    if not s.telegram_bot_token or not s.telegram_channel_id:
+    if not _s().telegram_bot_token or not _s().telegram_channel_id:
         logger.error("TELEGRAM_BOT_TOKEN or TELEGRAM_CHANNEL_ID not set")
         return False
 
-    url = f"https://api.telegram.org/bot{s.telegram_bot_token}/sendMessage"
+    url = f"https://api.telegram.org/bot{_s().telegram_bot_token}/sendMessage"
     payload = {
-        "chat_id": s.telegram_channel_id,
+        "chat_id": _s().telegram_channel_id,
         "text": _escape_markdown_v2(text),
         "parse_mode": "MarkdownV2"
     }
@@ -110,7 +98,7 @@ def publish_one(slug: str, dry_run: bool = False) -> bool:
         return False
 
     text = summary_path.read_text(encoding="utf-8")
-    fm, _ = parse_front_matter_yaml(text)
+    fm, _ = parse_frontmatter(text)
 
     print(f"Generating Telegram post for: {slug}...")
     try:

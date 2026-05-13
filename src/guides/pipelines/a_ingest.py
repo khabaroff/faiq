@@ -31,6 +31,7 @@ from guides.fetch.image_ocr import process_markdown_file
 from guides.security.fs_safety import assert_safe_slug, safe_join
 from guides.settings import Settings
 from guides.state import find_by_content_hash, get_state, set_state, update_frontmatter
+from guides.utils.slugify import slugify
 
 logger = logging.getLogger(__name__)
 
@@ -76,14 +77,6 @@ def scan_inbox(inbox_dir: Path) -> list[QueueItem]:
         elif ext in _TEXT_EXTENSIONS:
             items.extend(_expand_file(f))
     return items
-
-
-def slugify(text: str) -> str:
-    # Remove non-word characters and lowercase
-    text = re.sub(r"[^\w\s-]", "", text.lower())
-    # Replace spaces/underscores with hyphens
-    text = re.sub(r"[-\s_]+", "-", text).strip("-")
-    return text[:80]
 
 
 def _archive_file(source_path: Path, done_dir: Path) -> Path:

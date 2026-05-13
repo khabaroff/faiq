@@ -28,14 +28,17 @@ import json
 import re
 import sys
 from datetime import date
+from functools import cache as _cache
 from pathlib import Path
 
 import yaml
 
+from guides.frontmatter import parse_frontmatter
 from guides.llm import call_llm, get_smart_client, load_prompt
 from guides.security.fs_safety import assert_safe_slug, safe_join
 from guides.settings import Settings
 from guides.tools.daily_log import append_log_entry
+from guides.utils.slugify import slugify
 
 ROOT = Path(__file__).resolve().parent.parent.parent.parent
 CONTENT_DIR = ROOT / "public"
@@ -44,12 +47,9 @@ WIKI_TOOLS_DIR = CONTENT_DIR / "tools"
 WIKI_TECH_DIR = CONTENT_DIR / "techniques"
 
 
-s = Settings()
-
-
-def slugify(name: str) -> str:
-    s = re.sub(r"[^\w\s-]", "", name.lower())
-    return re.sub(r"[-\s]+", "-", s).strip("-")[:80]
+@_cache
+def _s() -> "Settings":
+    return Settings()
 
 
 def canonicalize_slug(name: str, existing_slugs: list[str], item_type: str = "") -> str:
@@ -118,7 +118,7 @@ def call_llm_update(slug: str, current_page_md: str, tool_name: str, tool_type: 
         "Верни валидный JSON согласно контракту. Никакого markdown вокруг JSON."
     )
 
-    deployment = s.azure_deployment_fast or s.azure_deployment_smart
+    deployment = _s().azure_deployment_fast or _s().azure_deployment_smart
     response, usage = call_llm(get_smart_client(), deployment, prompt, system)
 
     json_match = re.search(r"\{[\s\S]*\}", response)
@@ -144,7 +144,7 @@ def write_wiki_page(page_path: Path, name: str, slug: str, item_type: str, url: 
     today = date.today().isoformat()
     created_at = today
     if page_path.exists():
-        fm, _ = parse_front_matter(page_path.read_text())
+        fm, _ = parse_frontmatter(page_path.read_text())
         created_at = fm.get("created_at", today)
 
     front_matter = (
@@ -179,25 +179,8 @@ def write_wiki_page(page_path: Path, name: str, slug: str, item_type: str, url: 
     page_path.write_text(front_matter + body)
 
 
-def parse_front_matter(text: str) -> tuple[dict, str]:
-    if not text.startswith("---\n"):
-        return {}, text
-    try:
-        end = text.index("\n---\n", 4)
-    except ValueError:
-        return {}, text
-    fm_raw = text[4:end]
-    body = text[end + 5:]
-    fm = {}
-    for line in fm_raw.splitlines():
-        if ":" in line:
-            k, _, v = line.partition(":")
-            fm[k.strip()] = v.strip()
-    return fm, body
-
-
 def append_mention_to_page(page_path: Path, new_mention: dict) -> None:
-    fm, body = parse_front_matter(page_path.read_text())
+    fm, body = parse_frontmatter(page_path.read_text())
 
     mentions_section_match = re.search(r"## Упоминания\n\n", body)
     if mentions_section_match:
@@ -301,7 +284,7 @@ def propagate_summary(slug: str, force: bool = False) -> int:
             elif action == "append_mention":
                 append_mention_to_page(page_path, new_mention)
             elif action == "rewrite_description":
-                fm, _ = parse_front_matter(current) if current else ({}, "")
+                fm, _ = parse_frontmatter(current) if current else ({}, "")
                 description_match = re.search(r"## Что это\n\n(.*?)(?=\n## |\Z)", page_md, re.DOTALL)
                 description = description_match.group(1).strip() if description_match else new_mention.get("role_in_article", "")
 
