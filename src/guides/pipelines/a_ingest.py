@@ -24,6 +24,7 @@ from pathlib import Path
 
 from guides.fetch.base import QueueItem, SourceKind, SourceType, detect_source_type
 from guides.fetch.github import fetch_github_gist, fetch_github_repo
+from guides.fetch.image_vision import analyze_image, is_image
 from guides.fetch.pdf import fetch_pdf
 from guides.fetch.url import fetch_url
 from guides.fetch.image_ocr import process_markdown_file
@@ -57,17 +58,22 @@ def _expand_file(f: Path) -> list[QueueItem]:
     return [QueueItem(source=str(f), source_kind=SourceKind.FILE, received_at=datetime.now(), origin="inbox")]
 
 
+_IMAGE_EXTENSIONS = frozenset({".jpg", ".jpeg", ".png", ".gif", ".webp"})
+_TEXT_EXTENSIONS = frozenset({".md", ".txt", ".pdf"})
+
+
 def scan_inbox(inbox_dir: Path) -> list[QueueItem]:
     if not inbox_dir.exists():
         return []
     items: list[QueueItem] = []
-    _TEXT_EXTENSIONS = {".md", ".txt", ".pdf"}
     for f in sorted(inbox_dir.iterdir()):
         if not f.is_file() or f.name.startswith("."):
             continue
-        if f.suffix.lower() not in _TEXT_EXTENSIONS:
-            continue
-        items.extend(_expand_file(f))
+        ext = f.suffix.lower()
+        if ext in _IMAGE_EXTENSIONS:
+            items.append(QueueItem(source=str(f), source_kind=SourceKind.FILE, received_at=datetime.now(), origin="inbox"))
+        elif ext in _TEXT_EXTENSIONS:
+            items.extend(_expand_file(f))
     return items
 
 
@@ -90,8 +96,59 @@ def _archive_file(source_path: Path, done_dir: Path) -> Path:
     return target
 
 
+def _process_image(item: QueueItem, settings: Settings) -> dict | None:
+    """Process image file through LLM vision → public/images/<slug>.md."""
+    image_path = Path(item.source)
+    try:
+        result = analyze_image(image_path)
+    except Exception as e:
+        logger.exception("Image analysis failed for %s: %s", item.source, e)
+        return None
+
+    title = result.get("title") or image_path.stem
+    slug = slugify(title) or hashlib.md5(item.source.encode()).hexdigest()[:8]
+
+    images_dir = settings.inbox_dir.parent / "public" / "images"
+    images_dir.mkdir(parents=True, exist_ok=True)
+
+    # Copy original image alongside markdown
+    dest_image = images_dir / f"{slug}{image_path.suffix.lower()}"
+    dest_image.write_bytes(image_path.read_bytes())
+
+    description = result.get("description", "")
+    extracted_text = result.get("extracted_text", "")
+    concepts = result.get("concepts", [])
+    visual_type = result.get("visual_type", "image")
+
+    concepts_yaml = "\n".join(f"  - {c}" for c in concepts)
+    frontmatter = (
+        "---\n"
+        f"title: {title}\n"
+        f"slug: {slug}\n"
+        f"source_type: image\n"
+        f"visual_type: {visual_type}\n"
+        f"source_image: {dest_image.name}\n"
+        f"fetched_at: {datetime.now().date().isoformat()}\n"
+        f"concepts:\n{concepts_yaml}\n"
+        "---\n\n"
+    )
+
+    body = f"![{title}]({dest_image.name})\n\n# {title}\n\n{description}\n\n"
+    if extracted_text:
+        body += f"## Extracted Text\n\n{extracted_text}\n"
+
+    out_path = images_dir / f"{slug}.md"
+    out_path.write_text(frontmatter + body, encoding="utf-8")
+
+    _archive_file(image_path, settings.inbox_dir / "done")
+    return {"slug": slug, "source_type": "image", "path": out_path, "content_hash": None}
+
+
 def process_item(item: QueueItem, settings: Settings) -> dict | None:
     try:
+        if is_image(Path(item.source)):
+            return _process_image(item, settings)
+
         source_type = detect_source_type(item)
         is_pdf = item.source.lower().endswith(".pdf")
         
@@ -220,6 +277,9 @@ def main(argv=None) -> int:
             set_state(slug, "raw", True)
             if res.get("content_hash"):
                 set_state(slug, "content_hash", res["content_hash"])
+            if res.get("source_type") == "image":
+                # Images are fully processed in A — skip Pipeline B
+                set_state(slug, "summarized_at", datetime.now().date().isoformat())
             processed_count += 1
             print(f"Ingested: {slug} -> {res['path']}")
 
