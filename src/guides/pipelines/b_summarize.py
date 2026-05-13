@@ -21,7 +21,6 @@ from __future__ import annotations
 
 import argparse
 import logging
-import re
 import sys
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import date
@@ -203,7 +202,6 @@ def main(argv=None) -> int:
     ap.add_argument("--force", action="store_true", help="re-summarize even if exists")
     ap.add_argument("--batch", type=int, default=0, help="limit to N items (0 = all)")
     ap.add_argument("--workers", type=int, default=4, help="parallel LLM workers")
-    from guides.state import list_pending
 
     args = ap.parse_args(argv)
 
@@ -231,7 +229,7 @@ def main(argv=None) -> int:
                 else:
                     print(f"  → {out}")
                     processed += 1
-            except Exception as e:
+            except Exception:
                 logger.exception("Failed to summarize %s", slug)
 
     print(f"Processed {processed} summaries")

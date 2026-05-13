@@ -32,7 +32,7 @@ def estimate_cost(model: str, prompt_tokens: int, completion_tokens: int) -> flo
     if "mini" in model.lower():
         # GPT-4o-mini style: $0.15 / 1M input, $0.60 / 1M output
         return (prompt_tokens * 0.15 / 1_000_000) + (completion_tokens * 0.60 / 1_000_000)
-    
+
     return (prompt_tokens * 5.00 / 1_000_000) + (completion_tokens * 15.00 / 1_000_000)
 
 

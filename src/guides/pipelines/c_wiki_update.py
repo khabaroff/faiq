@@ -91,7 +91,7 @@ def canonicalize_slug(name: str, existing_slugs: list[str], item_type: str = "")
         score_cutoff=85,
     )
     if result is not None:
-        matched_slug, score, _ = result
+        matched_slug, _score, _ = result
         return matched_slug
 
     # No close match → new slug
@@ -181,7 +181,6 @@ def write_wiki_page(page_path: Path, name: str, slug: str, item_type: str, url: 
     for m in mentions:
         source_slug = m.get("source_slug", "")
         source_url = m.get("source_url", "")
-        role = m.get("role_in_article", "")
         quote = m.get("quote", "")
         body += f"- [{source_slug}](../summaries/{source_slug}.md)"
         if quote:
@@ -283,7 +282,7 @@ def propagate_summary(slug: str, force: bool = False) -> int:
                     tool_type=kind,
                     new_mention=new_mention,
                 )
-            except Exception as e:
+            except Exception:
                 logger.exception("LLM error for %s/%s", slug, name)
                 continue
 
@@ -301,7 +300,7 @@ def propagate_summary(slug: str, force: bool = False) -> int:
             elif action == "append_mention":
                 append_mention_to_page(page_path, new_mention)
             elif action == "rewrite_description":
-                fm, _ = parse_frontmatter(current) if current else ({}, "")
+                _fm, _ = parse_frontmatter(current) if current else ({}, "")
                 description_match = re.search(r"## Что это\n\n(.*?)(?=\n## |\Z)", page_md, re.DOTALL)
                 description = description_match.group(1).strip() if description_match else new_mention.get("role_in_article", "")
 
@@ -327,7 +326,7 @@ def propagate_summary(slug: str, force: bool = False) -> int:
 
 def main(argv=None) -> int:
     ap = argparse.ArgumentParser()
-    from guides.state import get_state, list_pending, set_state, update_frontmatter
+    from guides.state import get_state, set_state
 
     ap.add_argument("--slug", help="single summary slug to propagate")
     ap.add_argument("--force", action="store_true", help="re-propagate even if already propagated")
@@ -357,7 +356,7 @@ def main(argv=None) -> int:
             set_state(slug, "wiki_propagated_at", date.today().isoformat())
             set_state(slug, "status", "propagated")
             total_processed += processed
-        except Exception as e:
+        except Exception:
             logger.exception("Failed to propagate %s", slug)
 
     print(f"Total wiki pages updated: {total_processed}")

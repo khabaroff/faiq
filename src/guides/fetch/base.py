@@ -1,18 +1,18 @@
 import re
 from dataclasses import dataclass, field
 from datetime import datetime
-from enum import Enum
+from enum import StrEnum
 from pathlib import Path
 
 from pydantic import BaseModel
 
 
-class SourceKind(str, Enum):
+class SourceKind(StrEnum):
     URL = "url"
     FILE = "file"
 
 
-class SourceType(str, Enum):
+class SourceType(StrEnum):
     ARTICLE = "ARTICLE"
     YOUTUBE = "YOUTUBE"
     GITHUB_REPO = "GITHUB_REPO"

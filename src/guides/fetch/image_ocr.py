@@ -6,7 +6,6 @@ import argparse
 import hashlib
 import json
 import mimetypes
-import os
 import re
 import sqlite3
 import sys
@@ -20,7 +19,7 @@ from typing import Literal
 
 from pydantic import BaseModel
 
-from guides.llm import call_smart_with_images, estimate_cost, extract_usage, record_to_log_extra
+from guides.llm import call_smart_with_images
 from guides.security.url_safety import validate_url
 from guides.settings import Settings
 
@@ -277,12 +276,12 @@ def run_vision_ocr(
         path_to_use.write_bytes(image_bytes)
 
     text, usage = call_smart_with_images(
-        OCR_PROMPT, 
-        [path_to_use], 
+        OCR_PROMPT,
+        [path_to_use],
         system="Return only valid JSON. Do not wrap in code fences or prose.",
         return_usage=True
     )
-    
+
     try:
         result = OCRResult.model_validate(_extract_json_from_text(text))
         return result, usage.prompt_tokens, usage.completion_tokens, usage.cost_usd

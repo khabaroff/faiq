@@ -13,7 +13,6 @@ def _extract_source_title(text: str) -> str:
     stripped = text.lstrip()
     if stripped.startswith("---\n"):
         lines = stripped.splitlines()
-        in_frontmatter = True
         for line in lines[1:]:
             if line.strip() == "---":
                 break

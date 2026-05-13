@@ -20,7 +20,7 @@ from pathlib import Path
 from guides.llm import call_llm, get_smart_client, load_prompt
 from guides.models import SummaryCheckResponse, WikiCleanResponse
 from guides.settings import Settings
-from guides.state import get_state, set_state, update_frontmatter
+from guides.state import set_state, update_frontmatter
 
 logger = logging.getLogger(__name__)
 

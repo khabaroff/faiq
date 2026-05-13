@@ -75,7 +75,7 @@ def main(argv: list[str] | None = None) -> int:
         try:
             text = f.read_text(encoding="utf-8")
             fm = parse_front_matter_yaml(text)
-            
+
             title = fm.get("title") or fm.get("slug") or f.stem
             rel_link = f"../summaries/{f.name}"
 
@@ -99,7 +99,7 @@ def main(argv: list[str] | None = None) -> int:
         for name in sorted(data_map.keys(), key=lambda s: s.lower()):
             mentions = data_map[name]
             count = len(mentions)
-            
+
             # Link to tool/technique page if it exists
             if wiki_dir and wiki_rel_path:
                 slug = slugify(name)
@@ -110,11 +110,11 @@ def main(argv: list[str] | None = None) -> int:
                     lines.append(f"- **{name}** ({count} mentions)")
             else:
                 lines.append(f"- **{name}** ({count} mentions)")
-            
+
             # List summaries where mentioned
             for m_title, m_link in sorted(mentions):
                 lines.append(f"  - [{m_title}]({m_link})")
-            
+
             lines.append("")
 
         out_path = index_dir / filename

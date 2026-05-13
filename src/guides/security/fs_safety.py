@@ -12,8 +12,8 @@ def safe_join(base: Path, name: str) -> Path:
     candidate = (base / name).resolve()
     try:
         candidate.relative_to(base.resolve())
-    except ValueError:
-        raise ValueError(f"Path traversal detected: {name!r} escapes {base}")
+    except ValueError as err:
+        raise ValueError(f"Path traversal detected: {name!r} escapes {base}") from err
     return candidate
 
 

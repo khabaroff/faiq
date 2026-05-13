@@ -15,7 +15,6 @@ from __future__ import annotations
 
 import argparse
 import hashlib
-import json
 import logging
 import re
 import sys
@@ -30,7 +29,7 @@ from guides.fetch.pdf import fetch_pdf
 from guides.fetch.url import fetch_url
 from guides.security.fs_safety import assert_safe_slug, safe_join
 from guides.settings import Settings
-from guides.state import find_by_content_hash, get_state, set_state, update_frontmatter
+from guides.state import find_by_content_hash, set_state
 from guides.utils.slugify import slugify
 
 logger = logging.getLogger(__name__)
@@ -50,7 +49,7 @@ def _expand_file(f: Path) -> list[QueueItem]:
         return [QueueItem(source=str(f), source_kind=SourceKind.FILE, received_at=datetime.now(), origin="inbox")]
 
     urls = [line.strip() for line in text.splitlines() if _URL_RE.match(line.strip())]
-    non_url_lines = [l for l in text.splitlines() if l.strip() and not _URL_RE.match(l.strip())]
+    non_url_lines = [line for line in text.splitlines() if line.strip() and not _URL_RE.match(line.strip())]
 
     if urls and not non_url_lines:
         # Pure URL list — one item per URL, archive source file after first
@@ -145,7 +144,7 @@ def process_item(item: QueueItem, settings: Settings) -> dict | None:
 
         source_type = detect_source_type(item)
         is_pdf = item.source.lower().endswith(".pdf")
-        
+
         # 1. Fetch
         if is_pdf:
             fetched = fetch_pdf(item)
@@ -187,7 +186,7 @@ def process_item(item: QueueItem, settings: Settings) -> dict | None:
         content_sources_dir = settings.inbox_dir.parent / "public" / "sources"
         content_sources_dir.mkdir(parents=True, exist_ok=True)
         out_path = safe_join(content_sources_dir, f"{slug}.md")
-        
+
         # Initial write
         out_path.write_text(fetched.raw_text, encoding="utf-8")
 
@@ -240,7 +239,6 @@ def process_item(item: QueueItem, settings: Settings) -> dict | None:
 
 
 def main(argv=None) -> int:
-    from guides.state import get_state, list_pending, set_state
 
     parser = argparse.ArgumentParser(description="Pipeline A: Ingest")
     parser.add_argument("--url", help="URL to ingest")

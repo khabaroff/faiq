@@ -18,7 +18,6 @@ from functools import cache as _cache
 from pathlib import Path
 
 import httpx
-import yaml
 
 from guides.frontmatter import parse_frontmatter
 from guides.llm import call_llm, get_smart_client, load_prompt
