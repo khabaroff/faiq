@@ -12,6 +12,11 @@ from guides.settings import Settings
 logger = logging.getLogger(__name__)
 
 
+@lru_cache(maxsize=1)
+def _get_settings() -> Settings:
+    return Settings()
+
+
 class UsageRecord(NamedTuple):
     prompt_tokens: int
     completion_tokens: int
@@ -128,12 +133,12 @@ def call_llm_with_images(
 
 
 def call_smart(prompt: str, system: str = "") -> str:
-    s = Settings()
+    s = _get_settings()
     return call_llm(_client(), s.azure_deployment_smart, prompt, system)
 
 
 def call_fast(prompt: str, system: str = "") -> str:
-    s = Settings()
+    s = _get_settings()
     deployment = s.azure_deployment_fast or s.azure_deployment_smart
     return call_llm(_client(), deployment, prompt, system)
 
@@ -141,13 +146,14 @@ def call_fast(prompt: str, system: str = "") -> str:
 def call_smart_with_images(
     prompt: str, image_paths: Sequence[Path], system: str = "", return_usage: bool = False
 ) -> str | tuple[str, UsageRecord]:
-    s = Settings()
+    s = _get_settings()
     text, usage = call_llm_with_images(_client(), s.azure_deployment_smart, prompt, image_paths, system)
     if return_usage:
         return text, usage
     return text
 
 
+@lru_cache(maxsize=64)
 def load_prompt(filename: str) -> str:
-    s = Settings()
+    s = _get_settings()
     return (s.prompts_dir / filename).read_text(encoding="utf-8")
