@@ -35,7 +35,7 @@ class StateTests(unittest.TestCase):
     def test_init_db_and_idempotency(self):
         init_db()
         self.assertTrue(self.db_path.exists())
-        
+
         # Verify columns
         conn = sqlite3.connect(str(self.db_path))
         cursor = conn.execute("PRAGMA table_info(articles)")
@@ -43,7 +43,7 @@ class StateTests(unittest.TestCase):
         self.assertIn("content_hash", cols)
         self.assertIn("compacted", cols)
         conn.close()
-        
+
         # Run again to test ALTER TABLE idempotency
         init_db()
 
@@ -57,11 +57,11 @@ class StateTests(unittest.TestCase):
             }
         }
         self.json_path.write_text(json.dumps(data))
-        
+
         init_db()
         count = migrate_from_json()
         self.assertEqual(count, 1)
-        
+
         state = get_state("test-slug")
         self.assertTrue(state["raw"])
         self.assertEqual(state["summarized_at"], "2026-05-13T10:00:00")
@@ -71,12 +71,12 @@ class StateTests(unittest.TestCase):
         init_db()
         set_state("slug1", "content_hash", "abc123")
         set_state("slug1", "raw", True)
-        
+
         state = get_state("slug1")
         self.assertEqual(state["content_hash"], "abc123")
         self.assertTrue(state["raw"])
         self.assertFalse(state["wiki_propagated"])
-        
+
         # Unknown field
         with self.assertRaises(ValueError):
             set_state("slug1", "unknown_field", "val")
@@ -95,7 +95,7 @@ class StateTests(unittest.TestCase):
         set_state("s3", "raw", True)
         set_state("s3", "summarized_at", "2026-05-13")
         set_state("s3", "wiki_propagated", False)
-        
+
         self.assertEqual(list_pending("raw"), ["s1"])
         self.assertEqual(list_pending("summarized"), ["s2"])
         self.assertEqual(list_pending("wiki_propagated"), ["s3"])
@@ -104,13 +104,13 @@ class StateTests(unittest.TestCase):
     def test_update_frontmatter(self):
         md_file = Path(self.tmpdir.name) / "test.md"
         md_file.write_text("# Title\n\nBody")
-        
+
         update_frontmatter(md_file, {"status": "active", "slug": "test"})
         content = md_file.read_text()
         self.assertTrue(content.startswith("---"))
         self.assertIn("status: active", content)
         self.assertIn("# Title", content)
-        
+
         # Update existing
         update_frontmatter(md_file, {"status": "reviewed"})
         content = md_file.read_text()
@@ -121,13 +121,13 @@ class StateTests(unittest.TestCase):
         init_db()
         md_file = Path(self.tmpdir.name) / "test.md"
         md_file.write_text("---\nstatus: draft\n---\nBody")
-        
+
         set_status("slug1", md_file, "active", edited_by="test-user")
-        
+
         state = get_state("slug1")
         self.assertEqual(state["status"], "active")
         self.assertEqual(state["last_edited_by"], "test-user")
-        
+
         content = md_file.read_text()
         self.assertIn("status: active", content)
         self.assertIn("last_edited_by: test-user", content)
@@ -150,7 +150,7 @@ class StateTests(unittest.TestCase):
         set_state("s1", "seo_optimized", False)
         set_state("s2", "seo_optimized", True)
         set_state("s2", "published_telegram", None)
-        
+
         self.assertEqual(list_pending("seo_optimized"), ["s1"])
         self.assertEqual(list_pending("published"), ["s2"])
 
