@@ -28,6 +28,7 @@ from guides.fetch.image_vision import analyze_image, is_image
 from guides.fetch.pdf import fetch_pdf
 from guides.fetch.url import fetch_url
 from guides.fetch.image_ocr import process_markdown_file
+from guides.security.fs_safety import assert_safe_slug, safe_join
 from guides.settings import Settings
 from guides.state import find_by_content_hash, get_state, set_state, update_frontmatter
 
@@ -184,11 +185,15 @@ def process_item(item: QueueItem, settings: Settings) -> dict | None:
         slug = slugify(title)
         if not slug:
             slug = hashlib.md5(item.source.encode()).hexdigest()[:8]
+        try:
+            assert_safe_slug(slug)
+        except ValueError:
+            slug = hashlib.md5(item.source.encode()).hexdigest()[:16]
 
         # 3. Save temp for OCR
         content_sources_dir = settings.inbox_dir.parent / "public" / "sources"
         content_sources_dir.mkdir(parents=True, exist_ok=True)
-        out_path = content_sources_dir / f"{slug}.md"
+        out_path = safe_join(content_sources_dir, f"{slug}.md")
         
         # Initial write
         out_path.write_text(fetched.raw_text, encoding="utf-8")

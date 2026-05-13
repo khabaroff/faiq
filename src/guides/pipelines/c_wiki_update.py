@@ -33,6 +33,7 @@ from pathlib import Path
 import yaml
 
 from guides.llm import call_llm, get_smart_client, load_prompt
+from guides.security.fs_safety import assert_safe_slug, safe_join
 from guides.settings import Settings
 from guides.tools.daily_log import append_log_entry
 
@@ -258,7 +259,12 @@ def propagate_summary(slug: str, force: bool = False) -> int:
                 continue
 
             page_slug = canonicalize_slug(name, existing, kind)
-            page_path = target_dir / f"{page_slug}.md"
+            try:
+                assert_safe_slug(page_slug)
+            except ValueError:
+                print(f"  unsafe slug skipped: {page_slug!r}", file=sys.stderr)
+                continue
+            page_path = safe_join(target_dir, f"{page_slug}.md")
 
             current = ""
             if page_path.exists():
