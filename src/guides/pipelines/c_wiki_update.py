@@ -27,7 +27,7 @@ import argparse
 import json
 import re
 import sys
-from datetime import date
+from datetime import date, datetime
 from functools import cache as _cache
 from pathlib import Path
 
@@ -45,6 +45,16 @@ CONTENT_DIR = ROOT / "public"
 SUMMARIES_DIR = CONTENT_DIR / "summaries"
 WIKI_TOOLS_DIR = CONTENT_DIR / "tools"
 WIKI_TECH_DIR = CONTENT_DIR / "techniques"
+
+
+def _backup_page(page_path: Path) -> None:
+    """Save copy of existing page before overwrite."""
+    if not page_path.exists():
+        return
+    backup_dir = page_path.parent / ".backups"
+    backup_dir.mkdir(exist_ok=True)
+    ts = datetime.now().strftime("%Y%m%dT%H%M%S")
+    backup_dir.joinpath(f"{page_path.stem}.{ts}.bak").write_bytes(page_path.read_bytes())
 
 
 @_cache
@@ -274,6 +284,8 @@ def propagate_summary(slug: str, force: bool = False) -> int:
 
             action = result.get("action", "create")
             page_md = result.get("page_md", "")
+
+            _backup_page(page_path)
 
             if action == "create" or not page_path.exists():
                 if page_md:

@@ -22,6 +22,7 @@ from __future__ import annotations
 import argparse
 import re
 import sys
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import date
 from functools import cache as _cache
 from pathlib import Path
@@ -183,12 +184,23 @@ def summarize_one(slug: str) -> Path:
     return out
 
 
+def _summarize_slug(slug: str, force: bool) -> str | None:
+    from guides.state import set_state
+    if not force and (SUMMARIES_DIR / f"{slug}.md").exists():
+        return None
+    out = summarize_one(slug)
+    set_state(slug, "summarized_at", date.today().isoformat())
+    set_state(slug, "status", "reviewed")
+    return str(out)
+
+
 def main(argv=None) -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("--slug", help="single slug to summarize")
     ap.add_argument("--force", action="store_true", help="re-summarize even if exists")
     ap.add_argument("--batch", type=int, default=0, help="limit to N items (0 = all)")
-    from guides.state import get_state, set_state, list_pending
+    ap.add_argument("--workers", type=int, default=4, help="parallel LLM workers")
+    from guides.state import list_pending
 
     args = ap.parse_args(argv)
 
@@ -204,19 +216,20 @@ def main(argv=None) -> int:
         slugs = slugs[:args.batch]
 
     processed = 0
-    for slug in slugs:
-        if not args.force and (SUMMARIES_DIR / f"{slug}.md").exists():
-            print(f"skip (exists): {slug}")
-            continue
-        print(f"summarize: {slug}")
-        try:
-            out = summarize_one(slug)
-            set_state(slug, "summarized_at", date.today().isoformat())
-            set_state(slug, "status", "reviewed")
-            print(f"  → {out}")
-            processed += 1
-        except Exception as e:
-            print(f"ERROR {slug}: {e}", file=sys.stderr)
+    workers = 1 if args.slug else args.workers
+    with ThreadPoolExecutor(max_workers=workers) as pool:
+        futures = {pool.submit(_summarize_slug, s, args.force): s for s in slugs}
+        for fut in as_completed(futures):
+            slug = futures[fut]
+            try:
+                out = fut.result()
+                if out is None:
+                    print(f"skip (exists): {slug}")
+                else:
+                    print(f"  → {out}")
+                    processed += 1
+            except Exception as e:
+                print(f"ERROR {slug}: {e}", file=sys.stderr)
 
     print(f"Processed {processed} summaries")
     return 0
