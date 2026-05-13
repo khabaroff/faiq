@@ -2,46 +2,52 @@
 
 ## PURPOSE
 
-Update or create a wiki page when a new mention arrives from a summary.
+Решить, что делать с wiki-страницей при появлении нового упоминания инструмента/паттерна из саммари.
 
-Two page types:
-- **tool** — конкретный продукт/сервис/библиотека (Claude Code, Obsidian, yt-dlp)
-- **pattern** — именованный подход/паттерн (Context Engineering, ReAct, Chain-of-Thought)
+Два типа страниц:
+- **tool** — конкретный продукт/сервис/библиотека (`Claude Code`, `Obsidian`, `yt-dlp`). Лежит в `public/tools/<slug>.md`.
+- **pattern** — именованный подход/паттерн (`Context Engineering`, `ReAct`, `Chain-of-Thought`). Лежит в `public/techniques/<slug>.md`.
 
-Audience: speaker preparing AI lectures + students who receive these pages as reference material.
+Аудитория: преподаватель AI-курса + студенты, получающие эти страницы как справочный материал к лекции.
 
 ## INPUT
 
-- `{{current_page_md}}` — current page content (empty string = new page)
-- `{{tool_name}}` — canonical name
-- `{{tool_type}}` — `tool` | `pattern`
-- `{{new_mention}}`:
+- `{{current_page_md}}` — текущее содержимое страницы. Строка `(пустая страница)` если страница ещё не создана.
+- `{{tool_name}}` — каноническое имя (точно как во frontmatter саммари).
+- `{{tool_type}}` — `tool` или `pattern`.
+- `{{new_mention}}` — JSON с полями:
   ```json
   {
-    "source_slug": "...",
-    "source_url": "...",
-    "role_in_article": "роль на русском",
-    "quote": "verbatim quote in original language"
+    "source_slug": "slug-исходной-статьи",
+    "source_url": "https://...",
+    "role_in_article": "роль инструмента/паттерна в статье на русском",
+    "quote": "verbatim quote из исходника в оригинальном языке"
   }
   ```
 
-## OUTPUT (JSON)
+## OUTPUT (JSON only, без markdown-обёртки)
 
 ```json
 {
   "action": "create" | "append_mention" | "rewrite_description",
-  "page_md": "full updated markdown of the page",
-  "reason": "one sentence why this action"
+  "page_md": "...",
+  "reason": "одно предложение почему такое решение"
 }
 ```
 
+### Когда `page_md` обязателен
+
+- `action: rewrite_description` — **ОБЯЗАТЕЛЬНО**. Полный markdown страницы, см. шаблоны ниже. Пайплайн парсит из него секцию `## Что это` и список упоминаний.
+- `action: create` — опционально. Если возвращаешь — будет записан как есть. Если оставишь пустую строку `""` — пайплайн соберёт страницу сам из `tool_name`, frontmatter и `new_mention`.
+- `action: append_mention` — НЕ нужен. Передавай пустую строку `""`. Пайплайн сам допишет упоминание.
+
 ## DECISION RULES
 
-- `create` — page doesn't exist yet. Build from this first mention.
-- `append_mention` — page exists, description is still accurate. Add to Mentions only.
-- `rewrite_description` — new mention adds a substantially different angle. Rewrite the description section.
+- `create` — `current_page_md == "(пустая страница)"`. Можешь вернуть `page_md = ""` и довериться пайплайну, либо собрать страницу по шаблону ниже.
+- `append_mention` — страница существует, описание адекватно покрывает новое упоминание. `page_md = ""`.
+- `rewrite_description` — страница есть, но новое упоминание добавляет существенно новый угол (новая область применения, важная деталь механики, ключевое ограничение). Перепишешь страницу целиком: новое описание интегрирует старое знание + новый угол, упоминания переносишь все какие были и добавляешь новое в конец.
 
-## PAGE TEMPLATES
+## PAGE TEMPLATES (для `rewrite_description` и опционально `create`)
 
 ### Tool page
 
@@ -59,19 +65,15 @@ updated_at: YYYY-MM-DD
 
 ## Что это
 
-Краткое описание на русском (2-4 предложения). Что делает, зачем нужен, в каком контексте используется.
-Не Википедия — живое объяснение как для студента.
+Краткое описание на русском, 2-4 предложения. Что делает, зачем нужен, в каком контексте используется.
+Живое объяснение для студента, не Википедия.
 
-## Ссылки
+## Упоминания
 
-- [Официальный сайт](url) — если есть
-
-## Упоминания в моих материалах
-
-- [название статьи](../../summaries/slug.md) — "verbatim quote" 
+- [<source_slug>](../summaries/<source_slug>.md) — "verbatim quote in original language"
 ```
 
-### Pattern page
+### Pattern page (`type: pattern`, но dir — `public/techniques/`)
 
 ```markdown
 ---
@@ -84,29 +86,52 @@ updated_at: YYYY-MM-DD
 
 # Pattern Name
 
-## Суть
+## Что это
 
-Краткое определение на русском (1-2 предложения). Что это за паттерн и зачем.
+Краткое описание на русском, 2-4 предложения, покрывающее: суть паттерна, как работает, когда применять.
 
-## Как работает
+## Упоминания
 
-2-4 предложения. Механизм, ключевая идея. Без занудства.
-
-## Когда применять
-
-- ситуация 1
-- ситуация 2
-
-## Упоминания в моих материалах
-
-- [название статьи](../../summaries/slug.md) — "verbatim quote"
+- [<source_slug>](../summaries/<source_slug>.md) — "verbatim quote in original language"
 ```
 
-## WRITING RULES
+**Важно:** секция всегда называется `## Что это` (даже для pattern). Пайплайн парсит именно её через regex.
 
-- Russian throughout (except quotes — always in original language)
-- Tone: concise, human, not encyclopedic. Like explaining to a smart student, not writing docs.
-- Description evolves: each new mention can sharpen understanding — rewrite when it adds real value.
-- Quote: verbatim from original source, never translated.
-- No "This tool is..." or "This pattern represents..." — start directly with the substance.
-- Language: технические имена (название инструмента, API, CLI) — в оригинале; всё остальное — по-русски; не транслитерировать.
+## DESCRIPTION RULES
+
+**Для tool (2-4 предложения):**
+
+Что делает, зачем нужен, в каком контексте используется. Без "Этот инструмент..." / "Данный сервис...". Начинай с сути.
+
+Примеры хорошего начала: "CLI-агент Anthropic для работы с кодом в терминале...", "Headless markdown-extractor для веб-страниц...".
+
+**Для pattern (2-4 предложения):**
+
+Суть (1 предл.), механика (1-2 предл.), когда применять (опционально). Без "Этот паттерн..." / "Данный подход...". Начинай с сути.
+
+Примеры: "Подача в контекст модели не всей истории, а тщательно отобранного среза...", "Чередование reasoning-шагов и вызовов внешних инструментов...".
+
+## ССЫЛКИ В УПОМИНАНИЯХ
+
+- Формат: `- [<source_slug>](../summaries/<source_slug>.md) — "quote"` (опционально хвост `(<source_url>)`).
+- Дубликаты по `source_slug` запрещены — при `rewrite_description` объединяй несколько quote'ов через `;` если статья та же.
+
+## LANGUAGE
+
+- Русский throughout.
+- Технические имена — в оригинале: `Claude Code`, `LangChain`, имена CLI-флагов и API.
+- Транслитерация запрещена.
+- Цитаты в `## Упоминания` — **always в оригинальном языке** (en/ru), без перевода.
+
+## STYLE
+
+- Концентрированный, прямой.
+- Без штампов: "является", "представляет собой", "позволяет осуществить".
+- Без disclaimers.
+- 2-4 предложения — лимит, не цель. Если хватает двух — двух.
+
+## CRITICAL
+
+- Только JSON. Без ```json-обёртки, без префиксов.
+- `page_md` — строка. Если пустая — `""`.
+- В `page_md` сохраняй точные имена секций (`## Что это`, `## Упоминания`) — иначе пайплайн не распарсит.

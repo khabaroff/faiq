@@ -2,37 +2,61 @@
 
 ## PURPOSE
 
-Generate SEO-optimized metadata for a summary page.
-Output goes into the page's YAML frontmatter.
+Сгенерировать SEO-метаданные для страницы саммари из `public/summaries/<slug>.md`.
+Результат пишется в YAML frontmatter саммари. Дальше Quartz собирает Open Graph и `<meta>`-теги для сайта.
 
 ## INPUT
 
-- `{{title}}` — article title (from source)
-- `{{tldr}}` — 1-2 sentence summary
-- `{{key_claims}}` — list of key claims
-- `{{tools}}` — tools mentioned (list)
-- `{{patterns}}` — patterns mentioned (list)
-- `{{source_url}}` — original URL
+- `{{title}}` — заголовок статьи (берётся из source.md или из summary frontmatter)
+- `{{tldr}}` — содержимое секции `## TL;DR` из саммари. Может быть пустым.
+- `{{key_claims}}` — JSON-массив ключевых тезисов (3-5 шт)
+- `{{tools}}` — JSON-массив именованных инструментов
+- `{{patterns}}` — JSON-массив именованных паттернов
+- `{{source_url}}` — оригинальный URL статьи
 
-## OUTPUT (JSON only, no markdown)
+## OUTPUT (JSON only, без markdown-обёртки)
 
 ```json
 {
-  "seo_title": "Title under 60 chars",
-  "seo_description": "Description under 160 chars. Specific, useful, no clickbait.",
-  "og_description": "Open Graph description, 1-2 sentences. Same tone as seo_description."
+  "seo_title": "Заголовок до 60 символов",
+  "seo_description": "Описание до 160 символов. Конкретно, полезно, без клик-бейта.",
+  "og_description": "Open Graph описание, 1-2 предложения. Тот же тон, что у seo_description."
 }
 ```
 
 ## RULES
 
-- `seo_title`: 50-60 chars. Factual, keyword-rich. No ":" if possible. No "How to", no "The Ultimate Guide".
-- `seo_description`: 130-160 chars. Включает ключевые термины из статьи. Пишем по-русски если статья на русском, по-английски если на английском.
-- If tools or patterns are prominent — mention them by name in description.
-- No exclamation marks. No "This article...". No "Learn how to...".
-- Tone: direct, specific, like a good librarian's annotation.
+### seo_title
+
+- 50-60 символов. Жёсткий лимит — 60.
+- Фактический, с ключевыми терминами из статьи.
+- По возможности без двоеточия.
+- Запрещены: "How to", "The Ultimate Guide", "Полное руководство", "Всё, что нужно знать".
+- Если `{{title}}` уже хорош и укладывается в 60 символов — можно использовать его лёгкую адаптацию.
+
+### seo_description
+
+- 130-160 символов. Жёсткий лимит — 160.
+- Включает ключевые термины из `{{tools}}`, `{{patterns}}` если они дают сигнал.
+- Источник смысла:
+  1. Если `{{tldr}}` непустой — основной источник.
+  2. Если `{{tldr}}` пустой — собирай из `{{key_claims}}` (первые 1-2 тезиса).
+- Запрещены: восклицательные знаки, "В статье...", "Узнайте, как...", "Эта статья рассказывает...".
+- Тон: прямой, конкретный, как аннотация хорошего библиотекаря.
+
+### og_description
+
+- 1-2 предложения, тот же тон, что у `seo_description`. Может быть чуть свободнее по длине (до ~200 символов), но без воды.
+- Если уместно — добавляет одну деталь сверх `seo_description` (например, упоминание главного инструмента).
 
 ## LANGUAGE
 
-Match source language: Russian article → Russian seo_description. English → English.
-Technical names (Claude Code, LangChain) stay in original regardless.
+- Соответствует языку оригинала: статья на русском → `seo_description` на русском. На английском → на английском. Определяй по `{{tldr}}` и `{{key_claims}}`.
+- Технические имена (`Claude Code`, `LangChain`, `ReAct`) — в оригинале независимо от языка описания.
+- Транслитерация запрещена.
+
+## CRITICAL
+
+- Только JSON. Без объяснений, без префиксов, без markdown-обёрток.
+- Длины проверяй сам перед выводом. Превышение лимитов = провал.
+- Если `{{tldr}}`, `{{key_claims}}`, `{{tools}}`, `{{patterns}}` все пустые — генерируй на основе одного `{{title}}` и помечай `seo_description` ёмко по заголовку.
