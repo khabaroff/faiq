@@ -23,7 +23,7 @@ def _parse_args() -> argparse.Namespace:
 
 
 def _log_dir() -> Path:
-    return Path("data/logs")
+    return Path(__file__).resolve().parent.parent.parent.parent / "logs"
 
 
 def _iter_log_files(log_dir: Path) -> list[Path]:
@@ -104,7 +104,7 @@ def main() -> int:
     args = _parse_args()
     log_dir = _log_dir()
     if not log_dir.exists():
-        print("No logs found in data/logs")
+        print(f"No logs found in {log_dir}")
         return 0
 
     entries = _collect_entries(_iter_log_files(log_dir), args.days)

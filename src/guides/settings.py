@@ -2,6 +2,8 @@ from pathlib import Path
 
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
+_ROOT = Path(__file__).resolve().parent.parent.parent
+
 
 class Settings(BaseSettings):
     azure_openai_api_key: str
@@ -17,8 +19,9 @@ class Settings(BaseSettings):
     jina_api_key: str | None = None
     telegram_bot_token: str | None = None
     telegram_channel_id: str | None = None
-    data_dir: Path = Path("data")
-    prompts_dir: Path = Path(__file__).resolve().parent.parent.parent.parent / "prompts"
+    inbox_dir: Path = _ROOT / "inbox"
+    logs_dir: Path = _ROOT / "logs"
+    prompts_dir: Path = _ROOT / "prompts"
     ocr_model: str = "gpt-5.4"
 
     model_config = SettingsConfigDict(env_file=".env")

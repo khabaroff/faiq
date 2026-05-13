@@ -6,12 +6,13 @@
 __pycache__/
 *.pyc
 .env
-data/sources/
-data/logs/
-data/state/
+public/sources/
+logs/
+state/
 wiki/extracts/
 wiki/log.md
 uv.lock
-data/inbox/_assets/
+inbox/_assets/
+inbox/done/
 .DS_Store
 **/.DS_Store

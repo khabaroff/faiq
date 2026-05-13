@@ -1,15 +1,15 @@
 """Pipeline A — Ingest+Format.
 
-Input: URL, local file (.md, .pdf), or GitHub repo URL from data/inbox/.
-Output: content/sources/<slug>.md with YAML frontmatter.
+Input: URL, local file (.md, .pdf), or GitHub repo URL from inbox/.
+Output: public/sources/<slug>.md with YAML frontmatter.
 
 Workflow:
   1. Detect source type.
   2. Fetch content (clean MD, metadata).
   3. OCR remote images (if article).
-  4. Save as content/sources/<slug>.md.
-  5. Move inbox file to data/inbox/done/.
-  6. Update state/index.json.
+  4. Save as public/sources/<slug>.md.
+  5. Move inbox file to inbox/done/.
+  6. Update state DB.
 """
 from __future__ import annotations
 
@@ -119,7 +119,7 @@ def process_item(item: QueueItem, settings: Settings) -> dict | None:
         if existing_slug:
             print(f"skip (already ingested): {item.source} -> content_hash matches {existing_slug}")
             if item.source_kind == SourceKind.FILE:
-                _archive_file(Path(item.source), settings.data_dir / "inbox" / "done")
+                _archive_file(Path(item.source), settings.inbox_dir / "done")
             return None
 
         # 2. Slug & Title
@@ -129,7 +129,7 @@ def process_item(item: QueueItem, settings: Settings) -> dict | None:
             slug = hashlib.md5(item.source.encode()).hexdigest()[:8]
 
         # 3. Save temp for OCR
-        content_sources_dir = settings.data_dir.parent / "public" / "sources"
+        content_sources_dir = settings.inbox_dir.parent / "public" / "sources"
         content_sources_dir.mkdir(parents=True, exist_ok=True)
         out_path = content_sources_dir / f"{slug}.md"
         
@@ -174,7 +174,7 @@ def process_item(item: QueueItem, settings: Settings) -> dict | None:
 
         # 6. Archive
         if item.source_kind == SourceKind.FILE:
-            _archive_file(Path(item.source), settings.data_dir / "inbox" / "done")
+            _archive_file(Path(item.source), settings.inbox_dir / "done")
 
         return {"slug": slug, "source_type": actual_type, "path": out_path, "content_hash": content_hash}
 
@@ -203,7 +203,7 @@ def main(argv=None) -> int:
         items.append(QueueItem(source=args.repo, source_kind=SourceKind.URL, received_at=datetime.now(), origin="cli"))
     else:
         # Batch mode: scan inbox
-        inbox_dir = settings.data_dir / "inbox"
+        inbox_dir = settings.inbox_dir
         items = scan_inbox(inbox_dir)
 
     # Track which source files (URL-lists) to archive after all their URLs are processed
@@ -224,7 +224,7 @@ def main(argv=None) -> int:
             print(f"Ingested: {slug} -> {res['path']}")
 
     # Archive URL-list source files after all items processed
-    done_dir = settings.data_dir / "inbox" / "done"
+    done_dir = settings.inbox_dir / "done"
     for src_path in url_list_files:
         p = Path(src_path)
         if p.exists():
