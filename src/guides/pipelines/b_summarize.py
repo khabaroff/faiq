@@ -30,7 +30,7 @@ from pathlib import Path
 import yaml
 
 from guides.frontmatter import parse_frontmatter
-from guides.llm import call_llm, get_smart_client, load_prompt
+from guides.llm import call_llm, get_smart_client, load_prompt, count_tokens
 from guides.settings import Settings
 from guides.tools.daily_log import append_log_entry
 
@@ -41,10 +41,9 @@ logger = logging.getLogger(__name__)
 def _s() -> Settings:
     return Settings()
 
-ROOT = Path(__file__).resolve().parent.parent.parent.parent
-CONTENT_DIR = ROOT / "public"
-SOURCES_DIR = CONTENT_DIR / "sources"
-SUMMARIES_DIR = CONTENT_DIR / "summaries"
+settings = _s()
+SOURCES_DIR = settings.sources_dir
+SUMMARIES_DIR = settings.summaries_dir
 
 MAX_RETRIES = 3
 _CORRECTION = (
@@ -183,7 +182,7 @@ def summarize_one(slug: str) -> Path:
     if llm_fm.get("quality") == "needs_review":
         canonical_fm["quality"] = "needs_review"
 
-    fm_str = "---\n" + yaml.dump(canonical_fm, allow_unicode=True, default_flow_style=False) + "---\n\n"
+    fm_str = "---\n" + yaml.safe_dump(canonical_fm, allow_unicode=True, default_flow_style=False) + "---\n\n"
 
     out = SUMMARIES_DIR / f"{slug}.md"
     out.parent.mkdir(parents=True, exist_ok=True)

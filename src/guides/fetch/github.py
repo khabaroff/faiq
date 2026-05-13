@@ -2,11 +2,13 @@ import httpx
 
 from guides.fetch.base import FetchedContent, QueueItem, SourceType
 from guides.fetch.jina import get_jina_reader_headers, get_jina_reader_url, throttle_jina_reader
+from guides.security.url_safety import validate_url
 from guides.settings import Settings
 
 
 def fetch_github_gist(item: QueueItem) -> FetchedContent:
     url = item.source.rstrip("/")
+    validate_url(url)
     gist_id = url.split("/")[-1]
     headers = _get_headers()
     description = gist_id
@@ -39,6 +41,7 @@ def fetch_github_gist(item: QueueItem) -> FetchedContent:
 
 def _fetch_gist_via_jina(url: str) -> str:
     try:
+        validate_url(url)
         throttle_jina_reader()
         resp = httpx.get(get_jina_reader_url(url), headers=get_jina_reader_headers(), timeout=30, follow_redirects=True)
         if resp.status_code == 200 and len(resp.text.strip()) > 100:
@@ -69,6 +72,7 @@ def _format_gist_text(gist_data: dict, url: str) -> str:
 
 def fetch_github_repo(item: QueueItem) -> FetchedContent:
     url = item.source.rstrip("/")
+    validate_url(url)
     parts = url.split("/")
     owner, repo = parts[-2], parts[-1]
 
@@ -127,6 +131,7 @@ def _get_headers() -> dict[str, str]:
 
 def _try_fetch_readme(url: str, headers: dict[str, str]) -> str:
     try:
+        validate_url(url)
         resp = httpx.get(url, headers=headers, timeout=30)
         if resp.status_code == 200:
             return resp.text

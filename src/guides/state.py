@@ -2,6 +2,7 @@
 
 import json
 import sqlite3
+import threading
 from datetime import datetime
 from pathlib import Path
 from typing import Any
@@ -13,13 +14,18 @@ STATE_DIR = ROOT / "state"
 DB_PATH = STATE_DIR / "articles.db"
 JSON_STATE = STATE_DIR / "index.json"
 
+_local = threading.local()
+
 
 def _get_conn() -> sqlite3.Connection:
-    STATE_DIR.mkdir(parents=True, exist_ok=True)
-    conn = sqlite3.connect(str(DB_PATH))
-    conn.row_factory = sqlite3.Row
-    conn.execute("PRAGMA journal_mode=WAL")
-    return conn
+    if not hasattr(_local, "conn"):
+        STATE_DIR.mkdir(parents=True, exist_ok=True)
+        conn = sqlite3.connect(str(DB_PATH), timeout=5.0)  # 5000ms busy_timeout
+        conn.row_factory = sqlite3.Row
+        conn.execute("PRAGMA journal_mode=WAL")
+        conn.execute("PRAGMA synchronous=NORMAL")
+        _local.conn = conn
+    return _local.conn
 
 
 def init_db() -> None:
@@ -37,6 +43,7 @@ def init_db() -> None:
              published_telegram TEXT,
              quality TEXT,
              quality_checked INTEGER DEFAULT 0,
+             qc_hash TEXT,
              status TEXT DEFAULT 'draft',
              revision_count INTEGER DEFAULT 0,
              last_edited_at TEXT,
@@ -50,6 +57,7 @@ def init_db() -> None:
      for col, definition in [
          ("content_hash", "TEXT"),
          ("quality_checked", "INTEGER DEFAULT 0"),
+         ("qc_hash", "TEXT"),
          ("status", "TEXT DEFAULT 'draft'"),
          ("revision_count", "INTEGER DEFAULT 0"),
          ("last_edited_at", "TEXT"),
@@ -61,7 +69,6 @@ def init_db() -> None:
              conn.commit()
          except sqlite3.OperationalError:
              pass  # column already exists
-     conn.close()
 
 
 def migrate_from_json() -> int:
@@ -91,14 +98,19 @@ def migrate_from_json() -> int:
         migrated += 1
 
     conn.commit()
-    conn.close()
     return migrated
 
 
+def _ensure_db() -> None:
+    if not DB_PATH.exists():
+        init_db()
+        migrate_from_json()
+
+
 def get_state(slug: str) -> dict[str, Any]:
+    _ensure_db()
     conn = _get_conn()
     row = conn.execute("SELECT * FROM articles WHERE slug = ?", (slug,)).fetchone()
-    conn.close()
 
     if row is None:
         return {}
@@ -113,6 +125,7 @@ def get_state(slug: str) -> dict[str, Any]:
         "published_telegram": row["published_telegram"],
         "quality": row["quality"],
         "quality_checked": bool(row["quality_checked"]),
+        "qc_hash": row["qc_hash"],
         "status": row["status"],
         "revision_count": row["revision_count"],
         "last_edited_at": row["last_edited_at"],
@@ -124,7 +137,7 @@ def get_state(slug: str) -> dict[str, Any]:
 _VALID_FIELDS = frozenset({
     "raw", "content_hash", "summarized_at", "wiki_propagated",
     "wiki_propagated_at", "seo_optimized", "published_telegram",
-    "quality", "quality_checked", "status", "revision_count",
+    "quality", "quality_checked", "qc_hash", "status", "revision_count",
     "last_edited_at", "last_edited_by", "compacted",
 })
 
@@ -135,6 +148,7 @@ _FIELD_SQL: dict[str, str] = {
 
 
 def set_state(slug: str, field: str, value: Any) -> None:
+    _ensure_db()
     if field not in _VALID_FIELDS:
         raise ValueError(f"Unknown state field: {field!r}")
 
@@ -145,17 +159,17 @@ def set_state(slug: str, field: str, value: Any) -> None:
 
     conn.execute(_FIELD_SQL[field], (slug, value, value))
     conn.commit()
-    conn.close()
 
 
 def find_by_content_hash(content_hash: str) -> str | None:
+    _ensure_db()
     conn = _get_conn()
     row = conn.execute("SELECT slug FROM articles WHERE content_hash = ?", (content_hash,)).fetchone()
-    conn.close()
     return row["slug"] if row else None
 
 
 def list_pending(stage: str) -> list[str]:
+     _ensure_db()
      conn = _get_conn()
 
      if stage == "raw":
@@ -171,7 +185,6 @@ def list_pending(stage: str) -> list[str]:
      else:
          rows = []
 
-     conn.close()
      return [row["slug"] for row in rows]
 
 
@@ -179,7 +192,7 @@ def update_frontmatter(filepath: Path, updates: dict) -> None:
      """Обновляет YAML frontmatter в .md файле, сохраняя тело."""
      text = filepath.read_text(encoding="utf-8")
      if not text.startswith("---"):
-         fm_str = "---\n" + yaml.dump(updates, allow_unicode=True, default_flow_style=False) + "---\n\n"
+         fm_str = "---\n" + yaml.safe_dump(updates, allow_unicode=True, default_flow_style=False) + "---\n\n"
          filepath.write_text(fm_str + text)
          return
 
@@ -190,13 +203,14 @@ def update_frontmatter(filepath: Path, updates: dict) -> None:
      except yaml.YAMLError:
          fm = {}
      fm.update(updates)
-     new_fm = yaml.dump(fm, default_flow_style=False, allow_unicode=True, sort_keys=False)
+     new_fm = yaml.safe_dump(fm, default_flow_style=False, allow_unicode=True, sort_keys=False)
      filepath.write_text(f"---\n{new_fm}---\n{body}")
 
 
 def set_status(slug: str, filepath: Path | None, status: str,
                edited_by: str = "", filepath_for_fm: Path | None = None) -> None:
      """Устанавливает status в SQLite и обновляет frontmatter .md файла."""
+     _ensure_db()
      now = datetime.now().isoformat(timespec="seconds")
      conn = _get_conn()
      conn.execute(
@@ -206,7 +220,6 @@ def set_status(slug: str, filepath: Path | None, status: str,
          (slug, status, now, edited_by, status, now, edited_by),
      )
      conn.commit()
-     conn.close()
 
      target = filepath_for_fm or filepath
      if target:
@@ -230,7 +243,3 @@ def load_state_json() -> dict:
 def save_state_json(state: dict) -> None:
     STATE_DIR.mkdir(parents=True, exist_ok=True)
     JSON_STATE.write_text(json.dumps(state, ensure_ascii=False, indent=2))
-
-
-init_db()
-migrate_from_json()

@@ -10,8 +10,10 @@ LLM: Azure mini (cheap).
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 import logging
+import re
 import sys
 from datetime import date
 from pathlib import Path
@@ -19,23 +21,27 @@ from pathlib import Path
 from guides.llm import call_llm, get_smart_client, load_prompt
 from guides.models import SummaryCheckResponse, WikiCleanResponse
 from guides.settings import Settings
-from guides.state import set_state, update_frontmatter
+from guides.state import get_state, set_state, update_frontmatter
 from guides.utils.json_extract import extract_first_json
 
 logger = logging.getLogger(__name__)
 
+settings = Settings()
 ROOT = Path(__file__).resolve().parent.parent.parent.parent
-QC_REPORT = ROOT / "state" / "quality-report.json"
+QC_REPORT = settings.state_dir / "quality-report.json"
 
 # Content paths
-PUBLIC_DIR = ROOT / "public"
-SOURCES_DIR = PUBLIC_DIR / "sources"
-SUMMARIES_DIR = PUBLIC_DIR / "summaries"
-TOOLS_DIR = PUBLIC_DIR / "tools"
-TECH_DIR = PUBLIC_DIR / "techniques"
+SOURCES_DIR = settings.sources_dir
+SUMMARIES_DIR = settings.summaries_dir
+TOOLS_DIR = settings.tools_dir
+TECH_DIR = settings.techniques_dir
 
 
 _extract_json = extract_first_json
+
+
+def _qc_hash(text: str) -> str:
+    return hashlib.sha256(text.encode()).hexdigest()[:16]
 
 
 def call_llm_summary_check(source_text: str, summary_text: str, slug: str) -> dict:
@@ -86,9 +92,17 @@ def check_summaries(slug_filter: str | None = None) -> list[dict]:
 
         print(f"Checking summary: {slug}...")
         try:
-            res = call_llm_summary_check(src_path.read_text(encoding="utf-8"), sum_path.read_text(encoding="utf-8"), slug)
+            source_text = src_path.read_text(encoding="utf-8")
+            summary_text = sum_path.read_text(encoding="utf-8")
+            new_hash = _qc_hash(source_text + summary_text)
+            stored = get_state(slug)
+            if stored.get("qc_hash") == new_hash and stored.get("quality_checked"):
+                print(f"  [skip] {slug} unchanged")
+                continue
+            res = call_llm_summary_check(source_text, summary_text, slug)
             res["slug"] = slug
             res["mode"] = "summary_check"
+            res["qc_hash"] = new_hash
             results.append(res)
         except Exception as e:
             logger.error("Failed QC for summary %s: %s", slug, e)
@@ -114,13 +128,22 @@ def clean_wiki_pages(slug_filter: str | None = None) -> list[dict]:
         slug = page.stem
         print(f"Cleaning wiki page: {slug}...")
         try:
-            res = call_llm_wiki_clean(page.read_text(encoding="utf-8"), slug)
+            page_text = page.read_text(encoding="utf-8")
+            new_hash = _qc_hash(page_text)
+            stored = get_state(slug)
+            if stored.get("qc_hash") == new_hash and stored.get("quality_checked"):
+                print(f"  [skip] {slug} unchanged")
+                continue
+            res = call_llm_wiki_clean(page_text, slug)
             res["slug"] = slug
             res["mode"] = "wiki_clean"
             res["path"] = str(page.relative_to(ROOT))
+            res["qc_hash"] = new_hash
 
             if res.get("verdict") == "needs_cleanup" and "cleaned_page_md" in res:
-                page.write_text(res["cleaned_page_md"], encoding="utf-8")
+                content = res["cleaned_page_md"]
+                content = re.sub(r'<[^>]+>', '', content)
+                page.write_text(content, encoding="utf-8")
                 print(f"  -> Cleaned: {slug}")
 
             results.append(res)
@@ -154,6 +177,8 @@ def main(argv=None) -> int:
         if res.get("verdict") != "error":
             slug = res["slug"]
             set_state(slug, "quality_checked", True)
+            if res.get("qc_hash"):
+                set_state(slug, "qc_hash", res["qc_hash"])
             if res.get("verdict"):
                 set_state(slug, "quality", res["verdict"])
                 if res["verdict"] == "ok":

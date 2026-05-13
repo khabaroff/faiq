@@ -1,9 +1,17 @@
 """Pydantic response models for LLM JSON outputs."""
 from __future__ import annotations
 
+import re
 from typing import Literal
 
 from pydantic import BaseModel, field_validator
+
+
+def _strip_html(text: str) -> str:
+    if not text:
+        return ""
+    # Remove all HTML tags
+    return re.sub(r'<[^>]+>', '', text)
 
 
 class WikiUpdateResponse(BaseModel):
@@ -17,6 +25,12 @@ class WikiUpdateResponse(BaseModel):
             return "create"
         return v  # type: ignore[return-value]
 
+    @field_validator("page_md", mode="before")
+    @classmethod
+    def _sanitize_page_md(cls, v: object) -> str:
+        s = _strip_html(str(v))
+        return s[:50000]
+
 
 class SummaryCheckResponse(BaseModel):
     verdict: Literal["ok", "needs_resummarize", "minor_fix", "error"] = "error"
@@ -28,6 +42,12 @@ class WikiCleanResponse(BaseModel):
     verdict: Literal["ok", "needs_cleanup", "error"] = "error"
     cleaned_page_md: str = ""
     issues: list[str] = []
+
+    @field_validator("cleaned_page_md", mode="before")
+    @classmethod
+    def _sanitize_cleaned_page_md(cls, v: object) -> str:
+        s = _strip_html(str(v))
+        return s[:50000]
 
 
 class SeoResponse(BaseModel):

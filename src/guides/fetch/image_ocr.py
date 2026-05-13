@@ -24,12 +24,9 @@ from guides.security.url_safety import validate_url
 from guides.settings import Settings
 
 settings = Settings()
-REPO_ROOT = Path(__file__).resolve().parent.parent.parent.parent
-SOURCES_DIR = REPO_ROOT / "public" / "sources"
-ASSETS_DIR = SOURCES_DIR / "_assets"
-STATE_DIR = REPO_ROOT / "state"
-CACHE_DB_PATH = STATE_DIR / "ocr_cache.sqlite"
-RUNS_LOG_PATH = REPO_ROOT / "logs" / "ocr_runs.jsonl"
+ASSETS_DIR = settings.sources_dir / "_assets"
+CACHE_DB_PATH = settings.state_dir / "ocr_cache.sqlite"
+RUNS_LOG_PATH = settings.logs_dir / "ocr_runs.jsonl"
 
 MODEL = settings.ocr_model
 PROMPT_VERSION = "v1"
@@ -69,7 +66,7 @@ OCR_PROMPT = (
 
 
 def _ensure_dirs() -> None:
-    STATE_DIR.mkdir(parents=True, exist_ok=True)
+    settings.state_dir.mkdir(parents=True, exist_ok=True)
     ASSETS_DIR.mkdir(parents=True, exist_ok=True)
     RUNS_LOG_PATH.parent.mkdir(parents=True, exist_ok=True)
 
@@ -121,6 +118,9 @@ def _download_url(url: str) -> tuple[bytes, str]:
     for attempt in range(1, MAX_RETRIES + 1):
         try:
             with urllib.request.urlopen(req, timeout=DEFAULT_TIMEOUT_SECONDS) as resp:
+                final_url = resp.geturl()
+                if final_url != url:
+                    validate_url(final_url)
                 data = resp.read()
                 content_type = resp.headers.get_content_type() or "application/octet-stream"
                 if not data:

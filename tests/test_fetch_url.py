@@ -14,26 +14,20 @@ from guides.fetch.url import _try_jina, fetch_url
 
 
 class FetchUrlTests(unittest.TestCase):
-    def test_defuddle_cli_uses_parse_subcommand(self) -> None:
+    def test_trafilatura_is_used_first(self) -> None:
         item = QueueItem(source="https://example.com/post", source_kind=SourceKind.URL, received_at=datetime.now())
 
-        with patch("guides.fetch.url.shutil.which", return_value=None), patch(
-            "guides.fetch.url.subprocess.run"
-        ) as run_mock:
-            run_mock.return_value = subprocess.CompletedProcess(
-                args=["npx"], returncode=0, stdout="# Title\n\nBody " + ("x" * 220), stderr=""
-            )
-
+        with patch("guides.fetch.url.trafilatura.fetch_url", return_value="<html>body</html>"), patch(
+            "guides.fetch.url.trafilatura.extract", return_value="extracted body " + ("x" * 200)
+        ) as extract_mock:
             fetch_url(item)
 
-        self.assertTrue(run_mock.called)
-        called_args = run_mock.call_args.args[0]
-        self.assertEqual(called_args[:4], ["npx", "-y", "defuddle-cli", "parse"])
+        self.assertTrue(extract_mock.called)
 
     def test_cloudflare_markdown_is_preferred_before_jina(self) -> None:
         item = QueueItem(source="https://example.com/post", source_kind=SourceKind.URL, received_at=datetime.now())
 
-        with patch("guides.fetch.url._try_defuddle", return_value=None), patch(
+        with patch("guides.fetch.url._try_trafilatura", return_value=None), patch(
             "guides.fetch.url._try_cloudflare_markdown", return_value=("cloudflare body", "cloudflare-markdown")
         ) as cloudflare_mock, patch("guides.fetch.url._try_jina") as jina_mock:
             jina_mock.side_effect = AssertionError("jina should not be called when cloudflare succeeds")

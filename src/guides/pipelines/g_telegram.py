@@ -23,12 +23,12 @@ from guides.frontmatter import parse_frontmatter
 from guides.llm import call_llm, get_smart_client, load_prompt
 from guides.settings import Settings
 from guides.state import get_state, set_state, update_frontmatter
+from guides.utils.redact import redact_tokens
 
 logger = logging.getLogger(__name__)
 
-ROOT = Path(__file__).resolve().parent.parent.parent.parent
-CONTENT_DIR = ROOT / "public"
-SUMMARIES_DIR = CONTENT_DIR / "summaries"
+settings = Settings()
+SUMMARIES_DIR = settings.summaries_dir
 
 
 @_cache

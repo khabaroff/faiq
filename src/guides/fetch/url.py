@@ -1,12 +1,12 @@
 import re
-import shutil
-import subprocess
+import trafilatura
 from pathlib import Path
 
 import httpx
 
 from guides.fetch.base import FetchedContent, QueueItem, SourceKind, SourceType
 from guides.fetch.jina import get_jina_reader_headers, get_jina_reader_url, throttle_jina_reader
+from guides.security.url_safety import validate_url
 
 
 def _extract_source_title(text: str) -> str:
@@ -37,7 +37,8 @@ def fetch_url(item: QueueItem) -> FetchedContent:
         return FetchedContent(raw_text=text, source_type=SourceType.ARTICLE, source_meta=meta)
 
     url = item.source
-    text, fetcher = _try_defuddle(url) or _try_cloudflare_markdown(url) or _try_jina(url) or (None, None)
+    validate_url(url)
+    text, fetcher = _try_trafilatura(url) or _try_cloudflare_markdown(url) or _try_jina(url) or (None, None)
 
     if not text:
         raise RuntimeError(f"Cannot fetch: {url}")
@@ -54,20 +55,13 @@ def fetch_url(item: QueueItem) -> FetchedContent:
     )
 
 
-def _try_defuddle(url: str) -> tuple[str, str] | None:
-    cmd = shutil.which("defuddle") or shutil.which("defuddle-cli")
-    if not cmd:
-        try:
-            result = subprocess.run(["npx", "-y", "defuddle-cli", "parse", url], capture_output=True, text=True, timeout=60)
-            if result.returncode == 0 and len(result.stdout.strip()) > 200:
-                return result.stdout.strip(), "defuddle-npx"
-        except Exception:
-            pass
-        return None
+def _try_trafilatura(url: str) -> tuple[str, str] | None:
     try:
-        result = subprocess.run([cmd, "parse", "--", url], capture_output=True, text=True, timeout=60)
-        if result.returncode == 0 and len(result.stdout.strip()) > 200:
-            return result.stdout.strip(), "defuddle"
+        downloaded = trafilatura.fetch_url(url)
+        if downloaded:
+            result = trafilatura.extract(downloaded)
+            if result and len(result.strip()) > 200:
+                return result.strip(), "trafilatura"
     except Exception:
         pass
     return None

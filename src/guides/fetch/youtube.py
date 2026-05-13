@@ -11,6 +11,8 @@ from guides.security.url_safety import validate_url
 
 def fetch_youtube(item: QueueItem) -> FetchedContent:
     url = item.source
+    if url.strip().lower().startswith("file:"):
+        raise ValueError(f"Blocked file scheme URL: {url}")
     transcript = _try_ytdlp(url) or _try_transcribe_service(url)
 
     meta: dict = {"url": url}

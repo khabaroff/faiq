@@ -26,10 +26,9 @@ from guides.utils.json_extract import extract_first_json
 
 logger = logging.getLogger(__name__)
 
-ROOT = Path(__file__).resolve().parent.parent.parent.parent
-CONTENT_DIR = ROOT / "public"
-SUMMARIES_DIR = CONTENT_DIR / "summaries"
-SOURCES_DIR = CONTENT_DIR / "sources"
+settings = Settings()
+SUMMARIES_DIR = settings.summaries_dir
+SOURCES_DIR = settings.sources_dir
 
 
 @_cache

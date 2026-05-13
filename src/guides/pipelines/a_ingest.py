@@ -183,7 +183,7 @@ def process_item(item: QueueItem, settings: Settings) -> dict | None:
             slug = hashlib.md5(item.source.encode()).hexdigest()[:16]
 
         # 3. Save temp for OCR
-        content_sources_dir = settings.inbox_dir.parent / "public" / "sources"
+        content_sources_dir = settings.sources_dir
         content_sources_dir.mkdir(parents=True, exist_ok=True)
         out_path = safe_join(content_sources_dir, f"{slug}.md")
 

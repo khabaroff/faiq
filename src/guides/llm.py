@@ -6,12 +6,44 @@ from functools import lru_cache
 from pathlib import Path
 from typing import Any, NamedTuple
 
-from openai import APIError, OpenAI, RateLimitError
+from openai import APIError, AzureOpenAI, OpenAI, RateLimitError
 from tenacity import retry, retry_if_exception_type, stop_after_attempt, wait_exponential
 
 from guides.settings import Settings
 
 logger = logging.getLogger(__name__)
+
+
+def count_tokens(text: str, model: str = "gpt-4o") -> int:
+    try:
+        import tiktoken
+        try:
+            enc = tiktoken.encoding_for_model(model)
+        except KeyError:
+            logger.warning("No encoding found for model %s, using cl100k_base", model)
+            enc = tiktoken.get_encoding("cl100k_base")
+        return len(enc.encode(text))
+    except Exception as e:
+        logger.warning("tiktoken failed: %s. Falling back to length-based estimation.", e)
+        # 1 token ~= 4 chars for EN, but for RU it's closer to 2 chars.
+        # Using a conservative 2 to avoid 429 storms.
+        return len(text) // 2
+
+
+def truncate_to_tokens(text: str, max_tokens: int, model: str = "gpt-4o") -> str:
+    try:
+        import tiktoken
+        try:
+            enc = tiktoken.encoding_for_model(model)
+        except KeyError:
+            enc = tiktoken.get_encoding("cl100k_base")
+        tokens = enc.encode(text)
+        if len(tokens) <= max_tokens:
+            return text
+        return enc.decode(tokens[:max_tokens])
+    except Exception:
+        # Fallback to rough char truncation
+        return text[:max_tokens * 2]
 
 
 @lru_cache(maxsize=1)
@@ -63,16 +95,22 @@ def record_to_log_extra(rec: UsageRecord) -> dict:
 
 
 @lru_cache(maxsize=1)
-def _client() -> OpenAI:
+def _client() -> AzureOpenAI:
     s = Settings()
-    return OpenAI(api_key=s.azure_openai_api_key, base_url=s.azure_openai_endpoint)
+    return AzureOpenAI(
+        api_key=s.azure_openai_api_key,
+        azure_endpoint=s.azure_openai_endpoint,
+        api_version=s.azure_openai_api_version,
+        timeout=120.0,
+        max_retries=4,
+    )
 
 
-def get_smart_client() -> OpenAI:
+def get_smart_client() -> AzureOpenAI:
     return _client()
 
 
-def get_fast_client() -> OpenAI:
+def get_fast_client() -> AzureOpenAI:
     return _client()
 
 
@@ -111,7 +149,7 @@ def _extract_response_text(response) -> str:
     reraise=True,
 )
 def _chat_create(client: OpenAI, deployment: str, messages: list) -> Any:
-    return client.chat.completions.create(model=deployment, messages=messages)
+    return client.chat.completions.create(model=deployment, messages=messages, timeout=120.0)
 
 
 def call_llm(client: OpenAI, deployment: str, prompt: str, system: str = "") -> tuple[str, UsageRecord]:

@@ -24,4 +24,32 @@ class Settings(BaseSettings):
     prompts_dir: Path = _ROOT / "prompts"
     ocr_model: str = "gpt-5.4"
 
+    @property
+    def public_dir(self) -> Path:
+        return _ROOT / "public"
+
+    @property
+    def state_dir(self) -> Path:
+        return _ROOT / "state"
+
+    @property
+    def summaries_dir(self) -> Path:
+        return self.public_dir / "summaries"
+
+    @property
+    def sources_dir(self) -> Path:
+        return self.public_dir / "sources"
+
+    @property
+    def tools_dir(self) -> Path:
+        return self.public_dir / "tools"
+
+    @property
+    def techniques_dir(self) -> Path:
+        return self.public_dir / "techniques"
+
+    @property
+    def images_dir(self) -> Path:
+        return self.public_dir / "images"
+
     model_config = SettingsConfigDict(env_file=".env")

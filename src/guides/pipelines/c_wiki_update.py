@@ -45,11 +45,10 @@ from guides.utils.slugify import slugify
 
 logger = logging.getLogger(__name__)
 
-ROOT = Path(__file__).resolve().parent.parent.parent.parent
-CONTENT_DIR = ROOT / "public"
-SUMMARIES_DIR = CONTENT_DIR / "summaries"
-WIKI_TOOLS_DIR = CONTENT_DIR / "tools"
-WIKI_TECH_DIR = CONTENT_DIR / "techniques"
+settings = Settings()
+SUMMARIES_DIR = settings.summaries_dir
+WIKI_TOOLS_DIR = settings.tools_dir
+WIKI_TECH_DIR = settings.techniques_dir
 
 
 def _backup_page(page_path: Path) -> None:
@@ -285,6 +284,8 @@ def propagate_summary(slug: str, force: bool = False) -> int:
 
             action = result.get("action", "create")
             page_md = result.get("page_md", "")
+            if page_md:
+                page_md = re.sub(r'<[^>]+>', '', page_md)
 
             _backup_page(page_path)
 
