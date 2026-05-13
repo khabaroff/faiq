@@ -58,37 +58,37 @@ flowchart TD
         D3[починить или пометить]
     end
 
-ROBOT_D -->|✅ ok / 🔧 cleaned| TOOLS
-     ROBOT_D -->|✅ ok / ♻️ needs_resummarize| SUMMARIES
+    ROBOT_D -->|✅ ok / 🔧 cleaned| TOOLS
+    ROBOT_D -->|✅ ok / ♻️ needs_resummarize| SUMMARIES
 
-     SUMMARIES --> ROBOT_E
+    SUMMARIES --> ROBOT_E
 
-     subgraph ROBOT_E["🤖 Robot E — SEO Optimizer"]
-         E1[прочитать summary]
-         E2[LLM → seo_title + seo_description]
-         E3[обновить frontmatter]
-         E1 --> E2 --> E3
-     end
+    subgraph ROBOT_E["🤖 Robot E — SEO Optimizer"]
+        E1[прочитать summary]
+        E2[LLM → seo_title + seo_description]
+        E3[обновить frontmatter]
+        E1 --> E2 --> E3
+    end
 
-     ROBOT_E -->|public/summaries/<slug>.md| SUMMARIES
+    ROBOT_E -->|public/summaries/<slug>.md| SUMMARIES
 
-     SUMMARIES --> ROBOT_G
-     TOOLS --> ROBOT_G
-     TECH --> ROBOT_G
+    SUMMARIES --> ROBOT_G
+    TOOLS --> ROBOT_G
+    TECH --> ROBOT_G
 
-     subgraph ROBOT_G["🤖 Robot G — Telegram Publisher"]
-         G1[следить за новыми summaries]
-         G2[LLM → пост для канала]
-         G3[отправить в Telegram]
-         G1 --> G2 --> G3
-     end
+    subgraph ROBOT_G["🤖 Robot G — Telegram Publisher"]
+        G1[следить за новыми summaries]
+        G2[LLM → пост для канала]
+        G3[отправить в Telegram]
+        G1 --> G2 --> G3
+    end
 
-     ROBOT_G -->|published_telegram| SUMMARIES
+    ROBOT_G -->|published_telegram| SUMMARIES
 
-     TOOLS --> PUB
-     TECH --> PUB
-     SUMMARIES --> PUB
-     SOURCES --> PUB
+    TOOLS --> PUB
+    TECH --> PUB
+    SUMMARIES --> PUB
+    SOURCES --> PUB
 
     subgraph PUB["📖 Публикация"]
         OBS[Obsidian Vault]
@@ -102,8 +102,8 @@ ROBOT_D -->|✅ ok / 🔧 cleaned| TOOLS
 
 ### Robot A — Fetcher+Formatter
 
-**Запуск:** `python -m guides.pipelines.a_ingest`  
-**Триггер:** новые файлы в `data/inbox/`  
+**Запуск:** `python -m guides.pipelines.a_ingest`
+**Триггер:** новые файлы в `data/inbox/`
 **Идемпотентен:** да (пропускает если `state[slug].raw == true`)
 
 | Тип входа | Как скачивает | Модель |
@@ -121,8 +121,8 @@ OCR картинок внутри статьи: **gpt-5.4-mini** (дёшево, 
 
 ### Robot B — Summarizer
 
-**Запуск:** `python -m guides.pipelines.b_summarize`  
-**Триггер:** новые файлы в `public/sources/`  
+**Запуск:** `python -m guides.pipelines.b_summarize`
+**Триггер:** новые файлы в `public/sources/`
 **Идемпотентен:** да (пропускает если `public/summaries/<slug>.md` существует)
 
 Промпт: `prompts/summary.md`
@@ -155,11 +155,11 @@ lecture_hooks:
 
 ### Robot C — WikiBot
 
-**Запуск:** `python -m guides.pipelines.c_wiki_update`  
-**Триггер:** новые файлы в `public/summaries/`  
+**Запуск:** `python -m guides.pipelines.c_wiki_update`
+**Триггер:** новые файлы в `public/summaries/`
 **Идемпотентен:** да (`state[slug].wiki_propagated`)
 
-Промпт: `prompts/wiki_tool_update.md`  
+Промпт: `prompts/wiki_tool_update.md`
 **Модель:** всегда **gpt-5.4-mini** (короткие запросы, дедуп по семантике)
 
 Вход: `tools` и `patterns` списки из frontmatter саммари (plain names, не JSON-блок).
@@ -175,8 +175,8 @@ lecture_hooks:
 
 ### Robot D — QualityBot
 
-**Запуск:** `python -m guides.pipelines.d_quality_check`  
-**Триггер:** периодически (не блокирует A/B/C)  
+**Запуск:** `python -m guides.pipelines.d_quality_check`
+**Триггер:** периодически (не блокирует A/B/C)
 **Модель:** всегда **gpt-5.4-mini** (дёшево)
 
 Два режима:
@@ -213,7 +213,7 @@ lecture_hooks:
 
 ## State Machine (guides-y7n)
 
-Сейчас: `state/index.json` — плоский JSON.  
+Сейчас: `state/index.json` — плоский JSON.
 Будущее: SQLite `state/articles.db`, таблица `articles`:
 
 | Поле | Тип | Смысл |

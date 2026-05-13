@@ -27,7 +27,7 @@ data/inbox/ → Pipeline A → public/sources/*.md
                                                    → Pipeline G (Telegram Publisher)
 ```
 
-Состояние: `state/index.json` — плоский JSON, ключ = slug.
+Состояние: `state/articles.db` — SQLite, таблица `articles`.
 
 ### Формат public/sources/*.md
 
@@ -122,7 +122,7 @@ Obsidian vault = `public/`. Относительные ссылки работа
 ## Important Constraints
 
 - `public/` = одновременно Obsidian vault + Quartz publish folder
-- `state/index.json` — не трогать руками, только пайплайны
+- `state/articles.db` — не трогать руками, только пайплайны
 - `data/inbox/done/` — архив, не удалять
 - Azure OpenAI — не менять routing-логику без обсуждения (стоимость)
 - Вся пользовательская документация — в `_human/`, не в `docs/`

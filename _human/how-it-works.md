@@ -2,7 +2,7 @@
 
 ## TL;DR
 
-Ты кидаешь материал в `data/inbox/` → крон запускает три пайплайна → результат лежит в `public/` → читаешь в Obsidian, публикуешь через Quartz.
+Ты кидаешь материал в `data/inbox/` → крон запускает пайплайны → результат лежит в `public/` → читаешь в Obsidian, публикуешь через Quartz.
 
 ---
 
@@ -17,10 +17,10 @@ public/             ← ПАБЛИК-ПАПКА (Quartz публикует ка�
   sources/           ← чистые отформатированные исходники
   summaries/         ← RU саммари по каждому исходнику
   tools/             ← страницы инструментов (Claude Code, Obsidian...)
-  patterns/        ← страницы техник и подходов
+  patterns/          ← страницы техник и подходов
 
 prompts/             ← промпты (можешь редактировать)
-state/index.json     ← что обработано (не трогать руками)
+state/articles.db    ← SQLite — что обработано (не трогать руками)
 logs/YYYY-MM-DD.md   ← дневной лог: что появилось и сколько стоило
 ```
 
@@ -74,7 +74,7 @@ https://github.com/owner/repo
 ## Что НЕ нужно делать
 
 - Не чистить `data/inbox/done/` — это архив, пусть лежит
-- Не трогать `state/index.json` — пайплайны сами отслеживают что обработано
+- Не трогать `state/articles.db` — пайплайны сами отслеживают что обработано
 - Не редактировать `public/sources/` вручную — перезапишется при reingest
 
 ---
@@ -84,7 +84,7 @@ https://github.com/owner/repo
 Крон на сервере запускает автоматически. Вручную:
 
 ```bash
-# Всё сразу (A → B → C)
+# Всё сразу (A → B → C → D → E → G)
 python -m guides.pipelines.run_all
 
 # Только скачать + отформатировать
@@ -104,10 +104,9 @@ python -m guides.pipelines.e_seo
 
 # Публикация в Telegram-канал
 python -m guides.pipelines.g_telegram
-
-# Всё сразу (A → B → C → D → E → G)
-python -m guides.pipelines.run_all
 ```
+
+Для запуска нужны переменные окружения из `.env` (Azure OpenAI, Telegram и т.д.).
 
 ---
 
@@ -152,20 +151,9 @@ lecture_hooks:
 
 После прогона через Pipeline E добавляются SEO-поля:
 ```yaml
-slug: building-effective-ai-agents
-source_url: https://...
-source_type: article
-summarized_at: 2026-05-13
 seo_title: "Строим агентов на Claude Code — паттерны и инструменты"
 seo_description: "Разбор Context Engineering, ReAct и практик построения AI-агентов. 22 конкретных тезиса."
 og_description: "Саммари статьи Anthropic про паттерны агентов."
-tools: [Claude Code, LangChain]
-patterns: [Context Engineering, ReAct]
-key_claims:
-  - главный тезис 1
-lecture_hooks:
-  - провокационный вопрос для аудитории
----
 ```
 
 После публикации в Telegram:
@@ -196,7 +184,7 @@ published_telegram: "2026-05-13T14:00:00"
 
 ## Публикация через Quartz
 
-`public/` = папка которую Quartz публикует как статический сайт.  
+`public/` = папка которую Quartz публикует как статический сайт.
 Конфиг Quartz смотри в `_human/quartz-setup.md` (TODO: создать).
 
 ---
