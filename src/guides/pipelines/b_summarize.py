@@ -20,12 +20,15 @@ Usage:
 from __future__ import annotations
 
 import argparse
+import logging
 import re
 import sys
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import date
 from functools import cache as _cache
 from pathlib import Path
+
+logger = logging.getLogger(__name__)
 
 import yaml
 
@@ -136,9 +139,9 @@ def call_llm_summary(slug: str, source_text: str, source_url: str, source_type: 
                 )
             return last_response
 
-        print(f"  attempt {attempt + 1}/{MAX_RETRIES}: bad frontmatter format", file=sys.stderr)
+        logger.warning("attempt %d/%d: bad frontmatter format for %s", attempt + 1, MAX_RETRIES, slug)
 
-    print(f"  all {MAX_RETRIES} attempts failed, marking needs_review", file=sys.stderr)
+    logger.error("all %d attempts failed for %s, marking needs_review", MAX_RETRIES, slug)
     return f"---\ntools: []\npatterns: []\nquality: needs_review\n---\n\n{last_response}"
 
 
@@ -229,7 +232,7 @@ def main(argv=None) -> int:
                     print(f"  → {out}")
                     processed += 1
             except Exception as e:
-                print(f"ERROR {slug}: {e}", file=sys.stderr)
+                logger.exception("Failed to summarize %s", slug)
 
     print(f"Processed {processed} summaries")
     return 0

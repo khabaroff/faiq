@@ -25,11 +25,14 @@ from __future__ import annotations
 
 import argparse
 import json
+import logging
 import re
 import sys
 from datetime import date, datetime
 from functools import cache as _cache
 from pathlib import Path
+
+logger = logging.getLogger(__name__)
 
 import yaml
 
@@ -255,7 +258,7 @@ def propagate_summary(slug: str, force: bool = False) -> int:
             try:
                 assert_safe_slug(page_slug)
             except ValueError:
-                print(f"  unsafe slug skipped: {page_slug!r}", file=sys.stderr)
+                logger.warning("unsafe slug skipped: %r", page_slug)
                 continue
             page_path = safe_join(target_dir, f"{page_slug}.md")
 
@@ -279,7 +282,7 @@ def propagate_summary(slug: str, force: bool = False) -> int:
                     new_mention=new_mention,
                 )
             except Exception as e:
-                print(f"  LLM error for {name}: {e}", file=sys.stderr)
+                logger.exception("LLM error for %s/%s", slug, name)
                 continue
 
             action = result.get("action", "create")
@@ -353,7 +356,7 @@ def main(argv=None) -> int:
             set_state(slug, "status", "propagated")
             total_processed += processed
         except Exception as e:
-            print(f"ERROR {slug}: {e}", file=sys.stderr)
+            logger.exception("Failed to propagate %s", slug)
 
     print(f"Total wiki pages updated: {total_processed}")
     return 0
