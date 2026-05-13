@@ -1,0 +1,123 @@
+"""Tests for image_ocr.process_markdown_file via injectable fetcher/vlm_runner."""
+from __future__ import annotations
+
+from pathlib import Path
+
+import pytest
+
+from guides.fetch.image_ocr import (
+    OCRResult,
+    NonImageContentError,
+    process_markdown_file,
+)
+
+_FAKE_SHA = "a" * 64
+_FAKE_CONTENT_TYPE = "image/png"
+_FAKE_BYTES = b"\x89PNG"
+
+
+def _make_fetcher(asset_path: Path):
+    def fetcher(url: str):
+        return _FAKE_SHA, asset_path, _FAKE_BYTES, _FAKE_CONTENT_TYPE
+    return fetcher
+
+
+def _make_vlm(result: OCRResult):
+    def vlm_runner(image_bytes, *, content_type, model, asset_path):
+        return result, 10, 5, 0.0001
+    return vlm_runner
+
+
+_GOOD_RESULT = OCRResult(
+    image_type="diagram",
+    visible_text="Hello World",
+    description="A test diagram.",
+)
+
+
+def test_no_images_unchanged(tmp_path):
+    md = tmp_path / "article.md"
+    md.write_text("# Title\n\nJust text, no images.\n")
+    stats = process_markdown_file(
+        md,
+        fetcher=_make_fetcher(tmp_path / "img.png"),
+        vlm_runner=_make_vlm(_GOOD_RESULT),
+    )
+    assert stats["remote_urls"] == 0
+    assert stats["inserted_blocks"] == 0
+    assert not stats["changed"]
+    assert md.read_text() == "# Title\n\nJust text, no images.\n"
+
+
+def test_remote_image_gets_ocr_block(tmp_path):
+    asset = tmp_path / (_FAKE_SHA + ".png")
+    asset.write_bytes(_FAKE_BYTES)
+    md = tmp_path / "article.md"
+    md.write_text("![fig](https://example.com/img.png)\n")
+    stats = process_markdown_file(
+        md,
+        fetcher=_make_fetcher(asset),
+        vlm_runner=_make_vlm(_GOOD_RESULT),
+    )
+    assert stats["inserted_blocks"] == 1
+    assert stats["changed"]
+    content = md.read_text()
+    assert "> **Image OCR (auto):**" in content
+    assert "Hello World" in content
+    assert "A test diagram." in content
+
+
+def test_non_image_url_skipped(tmp_path):
+    def fetcher_raises(url: str):
+        raise NonImageContentError(url, "text/html")
+
+    md = tmp_path / "article.md"
+    md.write_text("![fig](https://example.com/page.html)\n")
+    original = md.read_text()
+    stats = process_markdown_file(
+        md,
+        fetcher=fetcher_raises,
+        vlm_runner=_make_vlm(_GOOD_RESULT),
+    )
+    assert stats["inserted_blocks"] == 0
+    assert not stats["changed"]
+
+
+def test_existing_ocr_block_not_duplicated(tmp_path):
+    asset = tmp_path / (_FAKE_SHA + ".png")
+    asset.write_bytes(_FAKE_BYTES)
+    md = tmp_path / "article.md"
+    content = (
+        "![fig](https://example.com/img.png)\n"
+        "> **Image OCR (auto):**\n"
+        "> **Type:** diagram\n"
+        "> **Text:** Existing\n"
+        "> **Description:** Already there.\n"
+        "\n"
+    )
+    md.write_text(content)
+    stats = process_markdown_file(
+        md,
+        fetcher=_make_fetcher(asset),
+        vlm_runner=_make_vlm(_GOOD_RESULT),
+    )
+    assert stats["inserted_blocks"] == 0
+
+
+def test_multiple_images_in_one_file(tmp_path):
+    asset = tmp_path / (_FAKE_SHA + ".png")
+    asset.write_bytes(_FAKE_BYTES)
+    md = tmp_path / "article.md"
+    md.write_text(
+        "![a](https://example.com/a.png)\n"
+        "\nSome text\n\n"
+        "![b](https://example.com/b.png)\n"
+    )
+    stats = process_markdown_file(
+        md,
+        fetcher=_make_fetcher(asset),
+        vlm_runner=_make_vlm(_GOOD_RESULT),
+    )
+    assert stats["remote_urls"] == 2
+    assert stats["inserted_blocks"] == 2
+    assert stats["changed"]

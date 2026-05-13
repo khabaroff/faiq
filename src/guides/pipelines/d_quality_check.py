@@ -18,6 +18,7 @@ from datetime import date
 from pathlib import Path
 
 from guides.llm import call_llm, get_smart_client, load_prompt
+from guides.models import SummaryCheckResponse, WikiCleanResponse
 from guides.settings import Settings
 from guides.state import get_state, set_state, update_frontmatter
 
@@ -44,7 +45,6 @@ def _extract_json(text: str) -> dict:
 def call_llm_summary_check(source_text: str, summary_text: str, slug: str) -> dict:
     prompt_template = load_prompt("quality_check.md")
 
-    # Simple replacement for placeholder template
     prompt = prompt_template + f"\n\n## Вход\n\n### Source ({slug})\n{source_text[:5000]}\n\n### Summary\n{summary_text}"
 
     s = Settings()
@@ -53,7 +53,8 @@ def call_llm_summary_check(source_text: str, summary_text: str, slug: str) -> di
     system = "Ты — эксперт по качеству технической документации. Твоя задача — проверить соответствие саммари исходному тексту. Верни только JSON."
 
     response, _ = call_llm(get_smart_client(), deployment, prompt, system)
-    return _extract_json(response)
+    raw = _extract_json(response)
+    return SummaryCheckResponse.model_validate(raw).model_dump()
 
 
 def call_llm_wiki_clean(page_text: str, slug: str) -> dict:
@@ -67,7 +68,8 @@ def call_llm_wiki_clean(page_text: str, slug: str) -> dict:
     system = "Ты — редактор технической вики. Твоя задача — очистить страницу от дублей и битых ссылок. Верни только JSON."
 
     response, _ = call_llm(get_smart_client(), deployment, prompt, system)
-    return _extract_json(response)
+    raw = _extract_json(response)
+    return WikiCleanResponse.model_validate(raw).model_dump()
 
 
 def check_summaries(slug_filter: str | None = None) -> list[dict]:

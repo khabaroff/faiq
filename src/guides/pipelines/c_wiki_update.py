@@ -38,6 +38,7 @@ import yaml
 
 from guides.frontmatter import parse_frontmatter
 from guides.llm import call_llm, get_smart_client, load_prompt
+from guides.models import WikiUpdateResponse
 from guides.security.fs_safety import assert_safe_slug, safe_join
 from guides.settings import Settings
 from guides.tools.daily_log import append_log_entry
@@ -138,7 +139,7 @@ def call_llm_update(slug: str, current_page_md: str, tool_name: str, tool_type: 
     if not json_match:
         raise ValueError(f"No JSON in LLM response: {response[:200]}")
 
-    result = json.loads(json_match.group())
+    parsed = WikiUpdateResponse.model_validate(json.loads(json_match.group()))
 
     if usage:
         append_log_entry(
@@ -150,7 +151,7 @@ def call_llm_update(slug: str, current_page_md: str, tool_name: str, tool_type: 
             cost_usd=usage.cost_usd,
         )
 
-    return result
+    return parsed.model_dump()
 
 
 def write_wiki_page(page_path: Path, name: str, slug: str, item_type: str, url: str, description: str, mentions: list) -> None:

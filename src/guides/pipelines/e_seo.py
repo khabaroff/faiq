@@ -21,6 +21,7 @@ import yaml
 
 from guides.frontmatter import parse_frontmatter
 from guides.llm import call_llm, get_smart_client, load_prompt
+from guides.models import SeoResponse
 from guides.settings import Settings
 from guides.state import get_state, set_state, update_frontmatter
 
@@ -71,7 +72,8 @@ def call_llm_seo(fm: dict, body: str) -> dict:
     system = "You are a technical SEO expert. Return only valid JSON as requested. No prose."
 
     response, _ = call_llm(get_smart_client(), deployment, prompt, system)
-    return _extract_json(response)
+    raw = _extract_json(response)
+    return SeoResponse.model_validate(raw).model_dump(exclude_defaults=False)
 
 
 def optimize_one(slug: str) -> bool:
