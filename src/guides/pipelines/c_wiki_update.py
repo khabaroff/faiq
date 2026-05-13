@@ -32,8 +32,6 @@ from datetime import date, datetime
 from functools import cache as _cache
 from pathlib import Path
 
-logger = logging.getLogger(__name__)
-
 import yaml
 
 from guides.frontmatter import parse_frontmatter
@@ -43,6 +41,8 @@ from guides.security.fs_safety import assert_safe_slug, safe_join
 from guides.settings import Settings
 from guides.tools.daily_log import append_log_entry
 from guides.utils.slugify import slugify
+
+logger = logging.getLogger(__name__)
 
 ROOT = Path(__file__).resolve().parent.parent.parent.parent
 CONTENT_DIR = ROOT / "public"

@@ -27,14 +27,14 @@ from datetime import date
 from functools import cache as _cache
 from pathlib import Path
 
-logger = logging.getLogger(__name__)
-
 import yaml
 
 from guides.frontmatter import parse_frontmatter
 from guides.llm import call_llm, get_smart_client, load_prompt
 from guides.settings import Settings
 from guides.tools.daily_log import append_log_entry
+
+logger = logging.getLogger(__name__)
 
 
 @_cache
