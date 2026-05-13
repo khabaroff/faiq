@@ -26,16 +26,25 @@ def init_db() -> None:
         CREATE TABLE IF NOT EXISTS articles (
             slug TEXT PRIMARY KEY,
             raw INTEGER DEFAULT 0,
+            content_hash TEXT,
             summarized_at TEXT,
             wiki_propagated INTEGER DEFAULT 0,
             wiki_propagated_at TEXT,
             seo_optimized INTEGER DEFAULT 0,
             published_telegram TEXT,
-            quality TEXT
+            quality TEXT,
+            quality_checked INTEGER DEFAULT 0
         )
         """
     )
     conn.commit()
+    # add columns that may be missing in older DBs
+    for col, definition in [("content_hash", "TEXT"), ("quality_checked", "INTEGER DEFAULT 0")]:
+        try:
+            conn.execute(f"ALTER TABLE articles ADD COLUMN {col} {definition}")
+            conn.commit()
+        except sqlite3.OperationalError:
+            pass  # column already exists
     conn.close()
 
 
@@ -80,19 +89,21 @@ def get_state(slug: str) -> dict[str, Any]:
 
     return {
         "raw": bool(row["raw"]),
+        "content_hash": row["content_hash"],
         "summarized_at": row["summarized_at"],
         "wiki_propagated": bool(row["wiki_propagated"]),
         "wiki_propagated_at": row["wiki_propagated_at"],
         "seo_optimized": bool(row["seo_optimized"]),
         "published_telegram": row["published_telegram"],
         "quality": row["quality"],
+        "quality_checked": bool(row["quality_checked"]),
     }
 
 
 def set_state(slug: str, field: str, value: Any) -> None:
     conn = _get_conn()
 
-    if field in ("raw", "wiki_propagated", "seo_optimized"):
+    if field in ("raw", "wiki_propagated", "seo_optimized", "quality_checked"):
         value = 1 if value else 0
 
     conn.execute(
