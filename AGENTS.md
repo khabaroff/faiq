@@ -125,7 +125,7 @@ public/               ← Obsidian vault + Quartz output
   sources/            ← отформатированные исходники
   summaries/          ← русские саммари
   tools/              ← wiki-страницы инструментов
-  patterns/           ← wiki-страницы паттернов (techniques)
+  techniques/         ← wiki-страницы паттернов (frontmatter type: pattern)
   index/              ← семантические индексы (tools, patterns, concepts...)
 data/inbox/           ← кидать сюда (файлы/URL-списки)
 data/inbox/done/      ← архив обработанных
@@ -163,7 +163,7 @@ python -m guides.tools.validate_wiki          # валидация формат�
 
 1. `public/sources/*.md` — всегда начинается с YAML frontmatter (`title`, `slug`, `source_url`, `source_type`, `fetched_at`, `lang`)
 2. `public/summaries/*.md` — YAML frontmatter с `tools: [...]` и `patterns: [...]` (списки строк), тело с `[[wikilinks]]`
-3. `public/tools/*.md` и `public/patterns/*.md` — YAML frontmatter с `name`, `slug`, `type`, `created_at`, `updated_at`
+3. `public/tools/*.md` и `public/techniques/*.md` — YAML frontmatter с `name`, `slug`, `type`, `created_at`, `updated_at`
 4. slug = `slugify(title)[:80]` — единственный идентификатор артикула
 
 ### Testing

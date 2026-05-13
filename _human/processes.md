@@ -46,7 +46,7 @@ flowchart TD
     end
 
     ROBOT_C -->|public/tools/<tool>.md| TOOLS[(public/tools/)]
-    ROBOT_C -->|public/patterns/<tech>.md| TECH[(public/patterns/)]
+    ROBOT_C -->|public/techniques/<tech>.md| TECH[(public/techniques/)]
 
     TOOLS --> ROBOT_D
     TECH --> ROBOT_D
@@ -149,7 +149,9 @@ lecture_hooks:
 ---
 ```
 
-Тело использует `[[Claude Code]]` и `[[Context Engineering]]` как wikilinks.
+Тело **обязательно** начинается с секции `## TL;DR` (1-2 предложения) — Pipeline E парсит её через regex для SEO-описания. Далее идут стандартные 10 секций (Идеи, Ключевые тезисы, Цитаты, Факты, Рекомендации, Метафоры, Q&A, Упоминания, Для лекции).
+
+Wikilinks `[[Claude Code]]` и `[[Context Engineering]]` — только для имён из `tools`/`patterns` во frontmatter.
 
 ---
 
@@ -164,10 +166,16 @@ lecture_hooks:
 
 Вход: `tools` и `patterns` списки из frontmatter саммари (plain names, не JSON-блок).
 
+Куда пишет:
+- `tool` → `public/tools/<slug>.md`
+- `pattern` → `public/techniques/<slug>.md` (директория называется `techniques`, тип во frontmatter — `pattern`)
+
 Три режима:
-- `create` — новая страница инструмента/паттерна
-- `append_mention` — добавить упоминание
-- `rewrite_description` — переписать «Что это» если новый взгляд
+- `create` — новая страница. LLM возвращает `page_md=""` → пайплайн собирает страницу сам из имени + упоминания.
+- `append_mention` — добавить упоминание. `page_md=""`, пайплайн дописывает строку в `## Упоминания`.
+- `rewrite_description` — новый взгляд → LLM **обязан** вернуть полный `page_md` с секциями `## Что это` и `## Упоминания` (пайплайн парсит regex'ом).
+
+Секция описания всегда называется `## Что это` — и для tool, и для pattern. Никаких `## Суть`.
 
 Саммари с `quality: needs_review` обрабатываются как обычно, просто tools/patterns будут пустыми.
 
@@ -175,13 +183,24 @@ lecture_hooks:
 
 ### Robot D — QualityBot
 
-**Запуск:** `python -m guides.pipelines.d_quality_check`
+**Запуск:** `python -m guides.pipelines.d_quality_check [--mode summary|wiki|both] [--slug SLUG]`
 **Триггер:** периодически (не блокирует A/B/C)
 **Модель:** всегда **gpt-5.4-mini** (дёшево)
+**Промпт:** `prompts/quality_check.md`
+**Отчёт:** `state/quality-report.json`
 
-Два режима:
-- `summary_check` — проверяет цитаты в исходнике, ловит галлюцинации
-- `wiki_clean` — дедуп упоминаний, противоречия в описаниях
+Два режима с конкретными критериями:
+
+- `summary_check` — сверка `public/sources/<slug>.md` ↔ `public/summaries/<slug>.md`. Проверяет:
+  - TL;DR честно отражает главную мысль исходника
+  - tools/patterns не пропущены
+  - цитаты verbatim (не перефразированы)
+  - нет галлюцинаций (имена, цифры, продукты — существуют в исходнике)
+  - frontmatter валидный YAML
+  - Verdict: `ok` / `minor_fix` / `needs_resummarize`
+
+- `wiki_clean` — чистка `public/tools/*.md` и `public/techniques/*.md`. Ловит дубликаты упоминаний, битые ссылки, противоречия описание↔упоминания, короткие описания при ≥2 упоминаниях, транслитерацию имён.
+  - Verdict: `ok` / `needs_cleanup`. При `needs_cleanup` промпт возвращает `cleaned_page_md` — пайплайн перезаписывает страницу.
 
 ---
 
@@ -207,26 +226,35 @@ lecture_hooks:
 **Промпт:** `prompts/telegram_post.md`
 **Config:** `TELEGRAM_BOT_TOKEN` + `TELEGRAM_CHANNEL_ID` в `.env`
 
-Постит одну статью за раз в канал: bold заголовок + tldr + 2-3 тезиса + ссылки. Ставит `state[slug].published_telegram = ISO date`. `--dry-run` для превью без публикации.
+Постит одну статью за раз в канал в авторском голосе Сергея (исследователь-практик, думающий вслух — стиль из `_PLAYFULNESS/style/style-guide-personal-llm.md`):
+- 150-400 слов, спиральная формула (наблюдение → рефлексия → концептуализация → вопрос)
+- Bold-заголовок-крючок + спиральный текст + 🔗 источник + 📝 саммари (если URL известен)
+- Без буквы «ё», без «ты»-обращения, без директивных CTA, авторские маркеры (`поботать`, `критмыш` и т.д.) — максимум один на пост и только органично
+
+Ставит `state[slug].published_telegram = ISO timestamp`. `--dry-run` для превью без публикации.
 
 ---
 
-## State Machine (guides-y7n)
+## State Machine
 
-Сейчас: `state/index.json` — плоский JSON.
-Будущее: SQLite `state/articles.db`, таблица `articles`:
+Хранилище: `state/articles.db` (SQLite). Таблица `articles`, схема мигрируется при старте автоматически. Текущие колонки:
 
 | Поле | Тип | Смысл |
 |---|---|---|
 | slug | TEXT PK | идентификатор |
 | raw | INTEGER | Pipeline A выполнен |
 | summarized_at | TEXT | дата Pipeline B |
+| content_hash | TEXT | SHA-256 исходника (детект изменений) |
 | wiki_propagated | INTEGER | Pipeline C выполнен |
+| wiki_propagated_at | TEXT | дата Pipeline C |
+| quality_checked | INTEGER | Pipeline D прогнал |
 | seo_optimized | INTEGER | Pipeline E выполнен |
-| published_telegram | TEXT | дата публикации |
+| published_telegram | TEXT | ISO timestamp публикации |
 | quality | TEXT | ok / needs_review |
 
-Позволяет запросы типа: `SELECT slug WHERE seo_optimized=0 AND quality='ok'`.
+Запросы вида: `SELECT slug FROM articles WHERE seo_optimized=0 AND quality='ok'`.
+
+**Руками не править.** Чтение через `guides.state.get_state(slug)`, запись через `set_state(slug, key, value)`.
 
 ---
 

@@ -17,7 +17,7 @@ public/             ← ПАБЛИК-ПАПКА (Quartz публикует ка�
   sources/           ← чистые отформатированные исходники
   summaries/         ← RU саммари по каждому исходнику
   tools/             ← страницы инструментов (Claude Code, Obsidian...)
-  patterns/          ← страницы техник и подходов
+  techniques/        ← страницы паттернов и подходов (frontmatter type: pattern)
 
 prompts/             ← промпты (можешь редактировать)
 state/articles.db    ← SQLite — что обработано (не трогать руками)

@@ -21,7 +21,7 @@ Guides — система подготовки лекционного матер
 data/inbox/ → Pipeline A → public/sources/*.md
                           → Pipeline B → public/summaries/*.md
                                        → Pipeline C → public/tools/*.md
-                                                     public/patterns/*.md
+                                                     public/techniques/*.md
                                                    → Pipeline D (QualityBot)
                                                    → Pipeline E (SEO Optimizer)
                                                    → Pipeline G (Telegram Publisher)
@@ -68,7 +68,7 @@ published_telegram: "2026-05-13T14:00:00"
 
 Тело — 9 секций, технические названия в оригинале (без транслитерации), `[[Tool Name]]` wikilinks.
 
-### Формат public/tools/*.md и public/patterns/*.md
+### Формат public/tools/*.md и public/techniques/*.md (frontmatter `type: pattern`)
 
 ```yaml
 ---
