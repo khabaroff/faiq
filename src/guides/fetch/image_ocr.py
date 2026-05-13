@@ -23,13 +23,12 @@ from guides.llm import call_smart_with_images, estimate_cost, extract_usage, rec
 from guides.settings import Settings
 
 settings = Settings()
-REPO_ROOT = Path.cwd()
-CONTENT_DIR = REPO_ROOT / "content"
-SOURCES_DIR = CONTENT_DIR / "sources"
+REPO_ROOT = Path(__file__).resolve().parent.parent.parent.parent
+SOURCES_DIR = REPO_ROOT / "public" / "sources"
 ASSETS_DIR = SOURCES_DIR / "_assets"
-STATE_DIR = REPO_ROOT / "data" / "state"
+STATE_DIR = REPO_ROOT / "state"
 CACHE_DB_PATH = STATE_DIR / "ocr_cache.sqlite"
-RUNS_LOG_PATH = REPO_ROOT / "data" / "logs" / "ocr_runs.jsonl"
+RUNS_LOG_PATH = REPO_ROOT / "logs" / "ocr_runs.jsonl"
 
 MODEL = settings.ocr_model
 PROMPT_VERSION = "v1"
@@ -363,13 +362,19 @@ def process_markdown_file(
                 remote_urls_seen += len(refs)
                 continue
 
-            output.append(line)
+            rewritten_line = line
+            pending_ocr: list[str] = []
             for url in refs:
                 remote_urls_seen += 1
                 try:
                     sha256, asset_path, image_bytes, content_type = fetcher(url)
                 except NonImageContentError:
                     continue
+                try:
+                    rel = asset_path.relative_to(path.parent)
+                    rewritten_line = rewritten_line.replace(url, str(rel))
+                except ValueError:
+                    pass
                 cached = _load_cached_ocr(conn, sha256, prompt_version, model)
                 if cached is None:
                     result, tokens_in, tokens_out, cost_usd = vlm_runner(
@@ -407,8 +412,14 @@ def process_markdown_file(
                     result = cached
                     cache_hits += 1
 
-                output.extend(_render_ocr_block(result))
+                pending_ocr.extend(_render_ocr_block(result))
                 inserted_blocks += 1
+
+            if rewritten_line != line:
+                changed = True
+            output.append(rewritten_line)
+            if pending_ocr:
+                output.extend(pending_ocr)
                 changed = True
 
             idx += 1
