@@ -44,6 +44,21 @@ def main() -> int:
         except (ImportError, NotImplementedError):
             logger.warning("Pipeline D not ready, skipping")
 
+    logger.info("=== Pipeline E: SEO optimization ===")
+    try:
+        from guides.pipelines import e_seo
+        e_seo.main(["--force"] if args.force else [])
+    except (ImportError, Exception) as e:
+        logger.error("Pipeline E failed: %s", e)
+
+    logger.info("=== Pipeline G: Telegram publish ===")
+    try:
+        from guides.pipelines import g_telegram
+        # Telegram usually doesn't need --force as it depends on state[slug].published_telegram
+        g_telegram.main([])
+    except (ImportError, Exception) as e:
+        logger.error("Pipeline G failed: %s", e)
+
     logger.info("=== All done ===")
     return 0
 

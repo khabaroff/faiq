@@ -15,6 +15,8 @@ class Settings(BaseSettings):
     langfuse_host: str = "https://cloud.langfuse.com"
     github_token: str | None = None
     jina_api_key: str | None = None
+    telegram_bot_token: str | None = None
+    telegram_channel_id: str | None = None
     data_dir: Path = Path("data")
     prompts_dir: Path = Path("guides/prompts")
     ocr_model: str = "gpt-5.4"
