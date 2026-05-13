@@ -30,7 +30,7 @@ def _try_ytdlp(url: str) -> str | None:
         try:
             with tempfile.TemporaryDirectory() as tmpdir:
                 subprocess.run(
-                    ["yt-dlp"] + args + ["--skip-download", "--output", f"{tmpdir}/yt", url],
+                    ["yt-dlp"] + args + ["--skip-download", "--output", f"{tmpdir}/yt", "--", url],
                     capture_output=True, text=True, timeout=60,
                 )
                 vtt_files = list(Path(tmpdir).glob("*.vtt"))

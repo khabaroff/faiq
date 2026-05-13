@@ -11,6 +11,7 @@ from __future__ import annotations
 import argparse
 import json
 import logging
+import re
 import sys
 from datetime import datetime
 from pathlib import Path
@@ -74,18 +75,24 @@ def call_llm_telegram(fm: dict) -> str:
     response, _ = call_llm(get_smart_client(), deployment, prompt, system)
     return response.strip()
 
+def _escape_markdown_v2(text: str) -> str:
+    """Escape all MarkdownV2 special characters."""
+    # Characters that must be escaped in MarkdownV2
+    special = r'\_*[]()~`>#+-=|{}.!'
+    return re.sub(r'([' + re.escape(special) + r'])', r'\\\1', text)
+
 def send_telegram_message(text: str) -> bool:
     if not s.telegram_bot_token or not s.telegram_channel_id:
         logger.error("TELEGRAM_BOT_TOKEN or TELEGRAM_CHANNEL_ID not set")
         return False
-    
+
     url = f"https://api.telegram.org/bot{s.telegram_bot_token}/sendMessage"
     payload = {
         "chat_id": s.telegram_channel_id,
-        "text": text,
-        "parse_mode": "Markdown"
+        "text": _escape_markdown_v2(text),
+        "parse_mode": "MarkdownV2"
     }
-    
+
     try:
         with httpx.Client(timeout=10.0) as client:
             resp = client.post(url, json=payload)
@@ -93,18 +100,8 @@ def send_telegram_message(text: str) -> bool:
         return True
     except Exception as e:
         logger.error("Failed to send Telegram message: %s", e)
-        # If markdown parsing fails, try sending as plain text
-        if "can't parse entities" in str(e).lower():
-            logger.warning("Markdown parsing failed, retrying as plain text")
-            payload.pop("parse_mode")
-            try:
-                with httpx.Client(timeout=10.0) as client:
-                    resp = client.post(url, json=payload)
-                    resp.raise_for_status()
-                return True
-            except Exception as e2:
-                logger.error("Retry failed: %s", e2)
-        return False
+        # Never send unescaped content as fallback; surface the error instead.
+        raise
 
 def publish_one(slug: str, dry_run: bool = False) -> bool:
     summary_path = SUMMARIES_DIR / f"{slug}.md"
