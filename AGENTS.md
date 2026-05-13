@@ -105,107 +105,144 @@ bd close <id>         # Complete work
 - If push fails, resolve and retry until it succeeds
 <!-- END BEADS INTEGRATION -->
 
+## Project: Guides — AI Lecture Prep System
+
+### What this project does
+
+Статьи/видео/PDF → автоматические русские саммари → wiki-граф инструментов → Obsidian + сайт на Quartz.
+
+Подробнее: `_human/how-it-works.md` (для людей), `_human/processes.md` (все роботы и форматы).
+
+### Key directories
+
+```
+src/guides/           ← весь Python-код
+  pipelines/          ← a_ingest.py, b_summarize.py, c_wiki_update.py, d_quality_check.py
+  fetch/              ← url.py, github.py, pdf.py, youtube.py
+  tools/              ← CLI-утилиты: fix_source_meta.py, daily_log.py, cost_report.py
+prompts/              ← LLM-промпты (summary.md, wiki_tool_update.md, seo.md, telegram_post.md)
+public/               ← Obsidian vault + Quartz output
+  sources/            ← отформатированные исходники
+  summaries/          ← русские саммари
+  tools/              ← wiki-страницы инструментов
+  patterns/           ← wiki-страницы паттернов
+data/inbox/           ← кидать сюда (файлы/URL-списки)
+data/inbox/done/      ← архив обработанных
+state/index.json      ← состояние пайплайна (не трогать)
+```
+
+### Running pipelines
+
+```bash
+# полный цикл
+python -m guides.pipelines.run_all
+
+# по одному
+python -m guides.pipelines.a_ingest           # fetch → public/sources/
+python -m guides.pipelines.b_summarize        # summarize → public/summaries/
+python -m guides.pipelines.c_wiki_update      # tools/patterns wiki pages
+python -m guides.pipelines.d_quality_check    # hallucination/dedup check
+
+# с флагами
+python -m guides.pipelines.a_ingest --url https://...
+python -m guides.pipelines.b_summarize --batch 5
+python -m guides.pipelines.c_wiki_update --slug my-slug --force
+
+# инструменты
+python -m guides.tools.fix_source_meta --dry-run   # починить метаданные sources
+python -m guides.tools.cost_report                  # отчёт по расходам
+```
+
+### LLM routing
+
+- **gpt-5.4-mini** (`AZURE_DEPLOYMENT_FAST`): OCR картинок, саммари < 15K токенов, wiki-update, quality-check
+- **gpt-5.4** (`AZURE_DEPLOYMENT_SMART`): OCR PDF, саммари ≥ 15K токенов
+
+### Format invariants (never break these)
+
+1. `public/sources/*.md` — всегда начинается с YAML frontmatter (`title`, `slug`, `source_url`, `source_type`, `fetched_at`, `lang`)
+2. `public/summaries/*.md` — YAML frontmatter с `tools: [...]` и `patterns: [...]` (списки строк), тело с `[[wikilinks]]`
+3. `public/tools/*.md` и `public/patterns/*.md` — YAML frontmatter с `name`, `slug`, `type`, `created_at`, `updated_at`
+4. slug = `slugify(title)[:80]` — единственный идентификатор артикула
+
+### Testing
+
+```bash
+python -m pytest tests/
+```
 
 <claude-mem-context>
 # Memory Context
 
-# [guides] recent context, 2026-05-11 8:34pm GMT+4
+# [guides] recent context, 2026-05-11 10:33pm GMT+4
 
 Legend: 🎯session 🔴bugfix 🟣feature 🔄refactor ✅change 🔵discovery ⚖️decision 🚨security_alert 🔐security_note
 Format: ID TIME TYPE TITLE
 Fetch details: get_observations([IDs]) | Search: mem-search skill
 
-Stats: 50 obs (14,887t read) | 219,046t work | 93% savings
+Stats: 50 obs (16,353t read) | 230,940t work | 93% savings
 
 ### May 11, 2026
-1074 2:50p ✅ Tasks claimed and URL test dispatched to JUNIOR
-1076 " ✅ Mixed file handling task dispatched to SENIOR
-1080 2:51p 🔵 SENIOR completed mixed file handling implementation
-1081 " 🔵 JUNIOR hit Azure API rate limit while processing URL
-1082 " ✅ guides-45u closed. Git shows 9-line mixed file handling implementation
-1083 " 🔵 Task queue shows blocking dependencies, no ready work available
-1085 " ✅ New task created: commit mixed-file code and audit wiki indexes
-1086 " ✅ Task guides-4rb claimed and dispatched to SENIOR for commit + index audit
-1087 2:52p 🔵 Pipeline processes Martin Fowler distributed systems article end-to-end
-1090 " 🔵 Wiki vault contains 10 extracted documents; 57 LLM calls logged with cost tracking
-1091 " ✅ Both remaining tasks closed: complete work cycle finished
-1092 " 🔵 needs_review.txt shows Settings validation failures in queue
-1093 " 🔵 Wiki extracts organized by content type: articles, githubs, notes, pdfs, youtubes
-1094 2:53p 🔵 Pipeline uses two-stage LLM processing per document: gpt-5.4 → gpt-5.4-mini
-1095 " ✅ Two new multi-format source tests created: GitHub and YouTube ingestion
-1096 " ✅ GitHub and YouTube ingestion tests dispatched to both agents
-1099 " 🔵 YouTube test incomplete: youtubes/ directory empty, no test file created
-1100 2:54p 🔵 SENIOR completed GitHub test: repo extraction and wiki generation successful
-S429 Recover guides-y4y task execution after Gemini API error; request SENIOR to continue work or report status (May 11 at 3:21 PM)
-S431 Plan next phase of development in guides project after completing 5 feature tasks and closing all open issues (May 11 at 3:22 PM)
-S432 Plan next phase of guides project development; clarify direction after completing 5 feature tasks (May 11 at 3:22 PM)
-S433 Continuous monitoring and planning status during agent infrastructure outage (May 11 at 3:36 PM)
-S434 Plan next development phase; awaiting user direction while agents remain non-functional (May 11 at 3:36 PM)
-S435 Plan and execute next development phase after completing 5 core features; agents non-functional, awaiting direction (May 11 at 3:37 PM)
-S436 Continue session after queue emptied; assess current status and plan next work (May 11 at 3:38 PM)
 S437 Assess queue state and identify next work: add new URLs, fix gist URL support, or other tasks (May 11 at 8:21 PM)
-1147 8:21p 🔵 Wiki extracts inventory and directory structure
-1149 8:22p 🔵 GitHub gist fetch failures in needs_review queue
-1150 " 🔵 Inbox queue state: one YouTube video processed
 S442 Fix GitHub gist URL routing and implement end-to-end processing with graceful fallback (continuation from prior session) (May 11 at 8:22 PM)
-1153 " 🔵 URL fetcher architecture: multi-strategy chain for content extraction
-1155 " 🔵 GitHub URL routing excludes gist URLs; root cause of fetch failures
-1156 " 🔵 Fetch module architecture: specialized handlers for source types
-1158 " 🔵 Cost tracking and LLM accounting system implemented
-1159 8:23p 🔵 Cost tracking integrated with Langfuse distributed tracing
-1160 " 🔵 All 13 wiki extracts have quality_score in frontmatter; 100% coverage
-1161 " 🔵 Pipeline logs structure and Azure OpenAI integration details
-1162 " 🔵 Processing high-complexity documents: Knowledge Unit specification ingestion
-1163 " 🔵 Pipeline log truncation issue: llm_call entries exist but grep output truncated
-1164 " 🔵 Complete LLM cost aggregation: 84 calls, $3.09 total cost across batch processing
-1165 " 🔵 Task-specific model routing: gpt-5.4-mini for classification, gpt-5.4 for synthesis
-1166 8:24p 🔵 Model routing architecture: call_smart vs call_fast with conditional deployment selection
-1167 " 🔵 Task-level deployment selection: tags.py uses fast, article.py uses smart
-1168 " 🔵 Hierarchical chunking for long-form content: 25k character chunks with merge pass
-1169 " ✅ Added GITHUB_GIST source type enum value
-1170 " ✅ Added gist URL detection to routing logic; now classifies gist.github.com URLs separately
-1171 8:25p 🟣 GitHub gist fetcher implemented: fetch_github_gist with multi-file formatting
-1172 " 🟣 Pipeline routing updated for GitHub gist support; gist URLs now processed end-to-end
-1173 " ✅ GitHub gist wiki classification updated: gists now treated as references, not articles
-1174 " ✅ YouTube chunking optimized for cost: per-chunk summaries now use fast model (gpt-5.4-mini)
-1175 " 🔵 Cost reporting CLI tool: scripts/cost_report.py aggregates LLM usage by model and date
-1176 8:26p 🔵 Cost report execution confirms end-to-end cost tracking: $3.09 for 84 LLM calls
-1177 " ✅ GitHub gist URL added to inbox queue; detection verified working
-1178 " 🔵 Missing dependency blocks queue execution: pydantic_settings not installed
-1179 " 🔵 Gist URL in queue but not yet processed; remains unparsed in inbox.txt
-1181 " 🔵 Queue processor is library module, not executable script; missing __main__ entry point
-1183 " 🟣 Gist URL processed via process_stream.py entry point; dedup check marked as already processed
-1185 8:27p 🔵 Previous gist processing failed with "gist_not_supported" error; old failure entry blocking reprocess
-1187 " 🔵 Gist URL failed silently on reprocess; no entry in sources directory
-S443 Audit and fix GitHub gist URL pipeline issues; document configuration gaps and cost optimization opportunities (May 11 at 8:32 PM)
-**Investigated**: - Settings.py configuration structure (Azure OpenAI, GitHub token, Jina, Langfuse)
-    - Runtime config state: github_token MISSING, azure_deployment_smart=gpt-5.4, azure_deployment_fast=gpt-5.4-mini
-    - defuddle-cli availability and command structure (v0.1.0 via npx, requires "parse" subcommand)
-    - HTTP markdown behavior on gist.github.com (404) vs raw.githubusercontent.com (200 OK, 16.4KB)
-    - Fetcher fallback chain: defuddle → Jina → http-markdown
-    - Cost tracking: 86 calls, 657K tokens, $3.22 total
+S443 Audit and fix GitHub gist URL pipeline issues; document configuration gaps and cost optimization opportunities (May 11 at 8:27 PM)
+S445 Audit pipeline configuration, identify bugs in fetchers, document issues and fixes (May 11 at 8:32 PM)
+S450 Understand and document how to add annotated links (URL + comment) as files in the guides system (May 11 at 8:34 PM)
+S451 Observe primary Claude session: guides-nt5 src layout refactoring task completion and pipeline testing with real inbox data (May 11 at 9:11 PM)
+1262 9:26p ✅ Fixed sitecustomize.py: src/ now in sys.path
+1263 " 🔵 Full test suite passes with src/ layout
+1268 9:29p ⚖️ PDF OCR fallback + inbox archiving implementation plan
+1269 9:30p ⚖️ Implementation plan: PDF OCR fallback and inbox file archiving
+1270 " 🔵 process_stream.py located at src/process_stream.py; currently deleted in working tree
+1271 9:32p 🔵 src/process_stream.py implements inbox queue processing with lock-based concurrency control
+1272 " ✅ Implementation plan progress: moved to failing test phase
+1273 " 🔵 Scripts directory isolated from main codebase references
+1274 " 🟣 Created failing tests for PDF OCR fallback and inbox archiving
+1275 " 🔄 Migrated reprocess_stale.py to src/guides/tools/
+1277 9:33p 🔄 Migrated cost_report.py to src/guides/tools/
+1276 " 🔵 Failing tests confirm expected behavior gaps for OCR fallback and inbox archiving
+1278 " 🔵 Tools migration verified: module imports work, tests pass
+1279 9:35p 🟣 Implemented PDF OCR fallback and inbox file archiving
+1280 " 🟣 All tests passing: PDF OCR fallback and inbox archiving complete
+1281 " 🔵 Full regression test suite passing: 17/17 tests
+1282 " ✅ Marked all implementation tasks complete in OpenSpec
+1283 9:36p ✅ OpenSpec validation passed and project closed
+1284 " ✅ All implementation plan steps marked completed
+1286 9:42p 🔵 guides-nt5 task: refactor package to src layout
+1287 " 🔵 process_stream.py already refactored to src layout with guides imports
+1288 " ✅ Fixed process_stream module invocation path in reprocess_stale output
+1289 " 🟣 Created smoke_test.py in src/guides/tools with full guides package imports
+1290 9:43p 🟣 Created test_queue.py in src/guides/tools with queue classification tests
+1291 " ✅ Removed src/smoke_test.py - old location consolidation
+1292 " ✅ Consolidated tools from src root to src/guides/tools directory
+1293 " 🔵 Test suite passes with src layout migration complete
+1294 " ⚖️ guides-nt5 task completed and closed
+1295 9:44p 🔵 Inbox queue system state: 9 pending items, archive directory not yet created
+1300 9:47p ✅ Reset pipeline state and vault output
+1302 " 🔴 Pipeline fails to handle missing data/sources directory gracefully
+1303 " ✅ Created missing pipeline state directories and re-ran pipeline
+1304 " 🔵 Pipeline second run appears to hang, no new log entries or output
+1305 9:48p 🔵 Pipeline runs but fails on network connectivity - no internet access
+S452 Process inbox files through vault.py extraction pipeline and fix blocking behavior on needs_review pages (May 11 at 9:48 PM)
+1307 9:51p 🔵 Pipeline processing failures with universal connection errors
+1308 9:52p 🔵 LLM module uses Azure OpenAI with usage instrumentation
+S460 Implement wiki page format validator for guides-idm task — add post-processing validation gate that detects format violations and auto-fixes simple cases before storage. (May 11 at 9:59 PM)
+1324 10:07p ✅ Wiki quality issues identified and captured as tracked tasks
+1325 10:10p ✅ Task dependencies added to structure wiki remediation workflow
+1326 " ✅ Wiki remediation workflow dependency graph established
+1327 10:15p ✅ Wiki format enforcement task claimed and started
+1328 10:18p 🔵 Wiki processing pipeline has cleanup but no format validation gates
+1329 10:19p 🟣 Wiki validator with rejection and autofix for format violations
+1330 " 🟣 CLI tool for batch wiki validation and autofix
+S461 Implement wiki page format validator for guides-idm task; add validation gates that detect format violations and auto-fix simple cases before storage. (May 11 at 10:20 PM)
+1333 10:22p 🟣 Comprehensive test suite for wiki validator
+1335 " ✅ Task guides-idm closed: wiki validator implementation complete
+S462 Run validator on existing wiki corpus to check format compliance; identify remaining issues after bulk autofix application. (May 11 at 10:23 PM)
+1338 10:23p 🔵 guides-dux task: rework quality scoring and verification thresholds
+1340 10:24p 🔵 Current wiki quality score distribution is coarse and clustered
+1342 " 🔵 Quality score calculation pipeline identified
+1343 " 🔵 Current quality_score calculation is binary check-based with uniform weights
+1361 10:32p ✅ Expanded _HEADING_MAP with 22 new heading translations
 
-**Learned**: - defuddle-cli has required subcommand "parse"; code called without it → always failed silently → fell back to Jina
-    - GitHub API anonymous rate limit: 60 req/hour, triggers 502 on limit overflow (no auth token configured)
-    - Gist URLs return 404 on direct HTTP; need GitHub API (/gists/{id}) or Jina reader proxy
-    - raw.githubusercontent.com serves markdown as plain text/plain content-type (not text/markdown), still parseable
-    - http-markdown filter rejects text/html content-type (correct design, filters out web pages)
-    - Model routing: gpt-5.4 (smart, expensive) used for article rewrite; gpt-5.4-mini (fast) for YouTube chunks
-    - Cost per document: $3.22 ÷ 13 docs = $0.24/doc (high due to gpt-5.4 volume)
-
-**Completed**: - Fixed defuddle-cli subprocess calls: added "parse" subcommand in both npx and local paths (lines 32, 39)
-    - Test confirmed fix: `npx defuddle-cli parse https://example.com` returns 186 bytes (works)
-    - Created docs/todo.md with 7 prioritized issues, config status table, 4 improvements, cost analysis
-    - Committed: "fix(fetch): correct defuddle-cli subcommand + add todo doc" (2 files, 90 insertions)
-    - Documented critical gaps: GITHUB_TOKEN (rate limit fix), Jina API key (throttle lift), needs_review cleanup
-
-**Next Steps**: Address critical config items from TODO:
-    1. Add GITHUB_TOKEN to .env (PAT with gist read scope) → eliminates 502 errors on rate limit
-    2. Add jina_api_key to Settings.py and pass Bearer auth to _try_jina() → lift 5 req/min throttle
-    3. Implement README fallback (main → master → HEAD) in fetch_github_repo()
-    4. Test defuddle fallback path on real article URLs to verify "parse" subcommand fix works end-to-end
-    5. Optional: migrate article rewrite from gpt-5.4 to gpt-5.4-mini for cost reduction (~80% savings)
-
-
-Access 219k tokens of past work via get_observations([IDs]) or mem-search skill.
+Access 231k tokens of past work via get_observations([IDs]) or mem-search skill.
 </claude-mem-context>

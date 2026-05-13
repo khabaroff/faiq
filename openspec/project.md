@@ -1,31 +1,132 @@
 # Project Context
 
 ## Purpose
-[Describe your project's purpose and goals]
+
+Guides — система подготовки лекционного материала по AI-инструментам. Берёт статьи, видео, PDF, репозитории → делает структурированные русскоязычные саммари → строит wiki-граф инструментов и паттернов → публикует как статический сайт (Quartz) и в Telegram.
+
+Целевой пользователь: преподаватель / исследователь AI (Сергей Хабаров), который собирает корпус знаний об AI-агентах, context engineering, LLM-паттернах для лекций в ИИЧАВО.
 
 ## Tech Stack
-- [List your primary technologies]
-- [e.g., TypeScript, React, Node.js]
+
+- Python 3.12, `uv` для пакетов
+- `src/` layout: `src/guides/`
+- Azure OpenAI: gpt-5.4-mini (fast), gpt-5.4 (smart)
+- pyyaml 6.0 для frontmatter
+- httpx, defuddle-cli, yt-dlp для фетчинга
+- Obsidian + Quartz для публикации
+
+## Pipeline Architecture
+
+```
+data/inbox/ → Pipeline A → public/sources/*.md
+                         → Pipeline B → public/summaries/*.md
+                                      → Pipeline C → public/tools/*.md
+                                                    public/patterns/*.md
+                                                  → Pipeline D (QualityBot)
+                                                  → Pipeline E (SEO, planned)
+                                                  → Pipeline G (Telegram, planned)
+```
+
+Состояние: `state/index.json` — плоский JSON, ключ = slug.
+
+### Формат public/sources/*.md
+
+```yaml
+---
+title: ...
+slug: ...
+source_url: https://...
+source_type: article | youtube | pdf | repo | gist
+fetched_at: YYYY-MM-DD
+lang: en | ru
+---
+```
+
+### Формат public/summaries/*.md
+
+```yaml
+---
+slug: ...
+source_url: https://...
+source_type: article
+summarized_at: YYYY-MM-DD
+tools: [Claude Code, LangChain]
+patterns: [Context Engineering, ReAct]
+key_claims:
+  - тезис 1
+lecture_hooks:
+  - вопрос для аудитории
+quality: ok | needs_review   # needs_review = LLM не справился 3x
+---
+```
+
+Тело — 9 секций, технические названия в оригинале (без транслитерации), `[[Tool Name]]` wikilinks.
+
+### Формат public/tools/*.md и public/patterns/*.md
+
+```yaml
+---
+name: Claude Code
+slug: claude-code
+type: tool | pattern
+url: https://...
+created_at: YYYY-MM-DD
+updated_at: YYYY-MM-DD
+---
+```
 
 ## Project Conventions
 
 ### Code Style
-[Describe your code style preferences, formatting rules, and naming conventions]
+
+- Python, type hints, `from __future__ import annotations`
+- Все CLI-точки входа через `if __name__ == "__main__": sys.exit(main())`
+- Логи через `logging`, не `print` (в pipeline-коде)
+- `print()` допустим в CLI-инструментах (tools/)
+- Нет `TODO`/`FIXME` в коде — для этого есть beads-задачи
 
 ### Architecture Patterns
-[Document your architectural decisions and patterns]
+
+- Идемпотентность: каждый пайплайн проверяет state перед обработкой
+- Retry: до 3 попыток на LLM-вызов с correction prompt при сбое формата
+- Fallback-цепочки: defuddle → cloudflare-markdown → jina (для URL)
+- Slug-based identity: `slug = slugify(title)[:80]` — уникальный ID артикула
 
 ### Testing Strategy
-[Explain your testing approach and requirements]
+
+- pytest в `tests/`
+- Юнит-тесты для парсеров, slugify, extract_summary_fm
+- Интеграционные тесты по возможности используют реальный LLM (не mock)
+- Запуск: `python -m pytest tests/`
 
 ### Git Workflow
-[Describe your branching strategy and commit conventions]
+
+- Ветка `main`, коммиты напрямую
+- Conventional commits: `fix:`, `feat:`, `refactor:`, `docs:`, `chore:`
+- После каждой рабочей сессии: `git push`
 
 ## Domain Context
-[Add domain-specific knowledge that AI assistants need to understand]
+
+Контент: статьи/доклады/видео про AI-агентов, LLM-паттерны, context engineering, prompt engineering, инструменты (Claude Code, Cursor, LangGraph и т.д.).
+
+Саммари пишутся **по-русски** для русскоязычных лекций. Технические названия инструментов и паттернов — в оригинале (не "Клод Код", а "Claude Code"). Транслитерация запрещена.
+
+Obsidian vault = `public/`. Относительные ссылки работают в Obsidian-граф и в Quartz-сайте.
 
 ## Important Constraints
-[List any technical, business, or regulatory constraints]
+
+- `public/` = одновременно Obsidian vault + Quartz publish folder
+- `state/index.json` — не трогать руками, только пайплайны
+- `data/inbox/done/` — архив, не удалять
+- Azure OpenAI — не менять routing-логику без обсуждения (стоимость)
+- Вся пользовательская документация — в `_human/`, не в `docs/`
 
 ## External Dependencies
-[Document key external services, APIs, or systems]
+
+- Azure OpenAI API (`AZURE_OPENAI_API_KEY`, `AZURE_OPENAI_ENDPOINT`, `AZURE_DEPLOYMENT_FAST`, `AZURE_DEPLOYMENT_SMART`)
+- Jina Reader API (`JINA_API_KEY` — опционально, без него медленнее)
+- GitHub API (`GITHUB_TOKEN` — опционально, для приватных репо)
+- Telegram Bot API (`TELEGRAM_BOT_TOKEN`, `TELEGRAM_CHANNEL_ID` — для Pipeline G)
+- `defuddle-cli` (npm) — для чистки статей
+- `yt-dlp` (pip) — для YouTube субтитров
+- `pdftotext` (poppler) — для PDF
