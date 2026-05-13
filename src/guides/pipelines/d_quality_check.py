@@ -19,11 +19,11 @@ from pathlib import Path
 
 from guides.llm import call_llm, get_smart_client, load_prompt
 from guides.settings import Settings
+from guides.state import get_state, set_state
 
 logger = logging.getLogger(__name__)
 
 ROOT = Path.cwd()
-STATE_FILE = ROOT / "state" / "index.json"
 QC_REPORT = ROOT / "state" / "quality-report.json"
 
 # Content paths
@@ -32,20 +32,6 @@ SOURCES_DIR = PUBLIC_DIR / "sources"
 SUMMARIES_DIR = PUBLIC_DIR / "summaries"
 TOOLS_DIR = PUBLIC_DIR / "tools"
 TECH_DIR = PUBLIC_DIR / "techniques"
-
-
-def load_state() -> dict:
-    if STATE_FILE.exists():
-        try:
-            return json.loads(STATE_FILE.read_text(encoding="utf-8"))
-        except Exception:
-            return {}
-    return {}
-
-
-def save_state(state: dict) -> None:
-    STATE_FILE.parent.mkdir(parents=True, exist_ok=True)
-    STATE_FILE.write_text(json.dumps(state, ensure_ascii=False, indent=2), encoding="utf-8")
 
 
 def _extract_json(text: str) -> dict:
@@ -57,29 +43,29 @@ def _extract_json(text: str) -> dict:
 
 def call_llm_summary_check(source_text: str, summary_text: str, slug: str) -> dict:
     prompt_template = load_prompt("quality_check.md")
-    
+
     # Simple replacement for placeholder template
     prompt = prompt_template + f"\n\n## Вход\n\n### Source ({slug})\n{source_text[:5000]}\n\n### Summary\n{summary_text}"
-    
+
     s = Settings()
     deployment = s.azure_deployment_fast or s.azure_deployment_smart
-    
+
     system = "Ты — эксперт по качеству технической документации. Твоя задача — проверить соответствие саммари исходному тексту. Верни только JSON."
-    
+
     response, _ = call_llm(get_smart_client(), deployment, prompt, system)
     return _extract_json(response)
 
 
 def call_llm_wiki_clean(page_text: str, slug: str) -> dict:
     prompt_template = load_prompt("quality_check.md")
-    
+
     prompt = prompt_template + f"\n\n## Вход\n\n### Wiki Page ({slug})\n{page_text}"
-    
+
     s = Settings()
     deployment = s.azure_deployment_fast or s.azure_deployment_smart
-    
+
     system = "Ты — редактор технической вики. Твоя задача — очистить страницу от дублей и битых ссылок. Верни только JSON."
-    
+
     response, _ = call_llm(get_smart_client(), deployment, prompt, system)
     return _extract_json(response)
 
@@ -99,7 +85,7 @@ def check_summaries(slug_filter: str | None = None) -> list[dict]:
         if not src_path.exists():
             logger.warning("Source for summary %s not found", slug)
             continue
-        
+
         print(f"Checking summary: {slug}...")
         try:
             res = call_llm_summary_check(src_path.read_text(encoding="utf-8"), sum_path.read_text(encoding="utf-8"), slug)
@@ -109,13 +95,13 @@ def check_summaries(slug_filter: str | None = None) -> list[dict]:
         except Exception as e:
             logger.error("Failed QC for summary %s: %s", slug, e)
             results.append({"slug": slug, "mode": "summary_check", "verdict": "error", "error": str(e)})
-            
+
     return results
 
 
 def clean_wiki_pages(slug_filter: str | None = None) -> list[dict]:
     results = []
-    
+
     targets = []
     if slug_filter:
         for d in (TOOLS_DIR, TECH_DIR):
@@ -134,16 +120,16 @@ def clean_wiki_pages(slug_filter: str | None = None) -> list[dict]:
             res["slug"] = slug
             res["mode"] = "wiki_clean"
             res["path"] = str(page.relative_to(ROOT))
-            
+
             if res.get("verdict") == "needs_cleanup" and "cleaned_page_md" in res:
                 page.write_text(res["cleaned_page_md"], encoding="utf-8")
                 print(f"  -> Cleaned: {slug}")
-            
+
             results.append(res)
         except Exception as e:
             logger.error("Failed QC for wiki page %s: %s", slug, e)
             results.append({"slug": slug, "mode": "wiki_clean", "verdict": "error", "error": str(e)})
-            
+
     return results
 
 
@@ -153,12 +139,11 @@ def main() -> int:
     parser.add_argument("--slug", help="Process only this slug")
     args = parser.parse_args()
 
-    state = load_state()
     all_results = []
 
     if args.mode in ("summary", "both"):
         all_results.extend(check_summaries(args.slug))
-    
+
     if args.mode in ("wiki", "both"):
         all_results.extend(clean_wiki_pages(args.slug))
 
@@ -170,16 +155,14 @@ def main() -> int:
     for res in all_results:
         if res.get("verdict") != "error":
             slug = res["slug"]
-            state.setdefault(slug, {})["quality_checked"] = True
-
-    save_state(state)
+            set_state(slug, "quality_checked", True)
 
     QC_REPORT.parent.mkdir(parents=True, exist_ok=True)
     QC_REPORT.write_text(json.dumps({
         "ts": date.today().isoformat(),
         "results": all_results,
     }, ensure_ascii=False, indent=2), encoding="utf-8")
-    
+
     print(f"\nDone. Report saved to {QC_REPORT}")
     return 0
 

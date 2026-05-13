@@ -20,7 +20,6 @@ Usage:
 from __future__ import annotations
 
 import argparse
-import json
 import re
 import sys
 from datetime import date
@@ -36,7 +35,6 @@ ROOT = Path(__file__).resolve().parent.parent.parent.parent
 CONTENT_DIR = ROOT / "public"
 SOURCES_DIR = CONTENT_DIR / "sources"
 SUMMARIES_DIR = CONTENT_DIR / "summaries"
-STATE_FILE = ROOT / "state" / "index.json"
 
 MAX_RETRIES = 3
 _CORRECTION = (
@@ -54,17 +52,6 @@ _CORRECTION = (
 )
 
 s = Settings()
-
-
-def load_state() -> dict:
-    if STATE_FILE.exists():
-        return json.loads(STATE_FILE.read_text())
-    return {}
-
-
-def save_state(state: dict) -> None:
-    STATE_FILE.parent.mkdir(parents=True, exist_ok=True)
-    STATE_FILE.write_text(json.dumps(state, ensure_ascii=False, indent=2))
 
 
 def count_tokens(text: str) -> int:
@@ -218,9 +205,9 @@ def main() -> int:
     ap.add_argument("--slug", help="single slug to summarize")
     ap.add_argument("--force", action="store_true", help="re-summarize even if exists")
     ap.add_argument("--batch", type=int, default=0, help="limit to N items (0 = all)")
-    args = ap.parse_args()
+    from guides.state import get_state, set_state, list_pending
 
-    state = load_state()
+    args = ap.parse_args()
 
     if args.slug:
         slugs = [args.slug]
@@ -241,14 +228,12 @@ def main() -> int:
         print(f"summarize: {slug}")
         try:
             out = summarize_one(slug)
-            state.setdefault(slug, {})["summary"] = True
-            state[slug]["summarized_at"] = today = date.today().isoformat()
+            set_state(slug, "summarized_at", date.today().isoformat())
             print(f"  → {out}")
             processed += 1
         except Exception as e:
             print(f"ERROR {slug}: {e}", file=sys.stderr)
 
-    save_state(state)
     print(f"Processed {processed} summaries")
     return 0
 

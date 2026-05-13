@@ -24,7 +24,6 @@ Usage:
 from __future__ import annotations
 
 import argparse
-import json
 import re
 import sys
 from datetime import date
@@ -41,20 +40,9 @@ CONTENT_DIR = ROOT / "public"
 SUMMARIES_DIR = CONTENT_DIR / "summaries"
 WIKI_TOOLS_DIR = CONTENT_DIR / "tools"
 WIKI_TECH_DIR = CONTENT_DIR / "techniques"
-STATE_FILE = ROOT / "state" / "index.json"
+
 
 s = Settings()
-
-
-def load_state() -> dict:
-    if STATE_FILE.exists():
-        return json.loads(STATE_FILE.read_text())
-    return {}
-
-
-def save_state(state: dict) -> None:
-    STATE_FILE.parent.mkdir(parents=True, exist_ok=True)
-    STATE_FILE.write_text(json.dumps(state, ensure_ascii=False, indent=2))
 
 
 def slugify(name: str) -> str:
@@ -325,12 +313,12 @@ def propagate_summary(slug: str, force: bool = False) -> int:
 
 def main() -> int:
     ap = argparse.ArgumentParser()
+    from guides.state import get_state, set_state, list_pending
+
     ap.add_argument("--slug", help="single summary slug to propagate")
     ap.add_argument("--force", action="store_true", help="re-propagate even if already propagated")
     ap.add_argument("--batch", type=int, default=0, help="limit to N items (0 = all)")
     args = ap.parse_args()
-
-    state = load_state()
 
     if args.slug:
         slugs = [args.slug]
@@ -345,19 +333,18 @@ def main() -> int:
 
     total_processed = 0
     for slug in slugs:
-        if not args.force and state.get(slug, {}).get("wiki_propagated"):
+        if not args.force and get_state(slug).get("wiki_propagated"):
             print(f"skip (propagated): {slug}")
             continue
         print(f"propagate: {slug}")
         try:
             processed = propagate_summary(slug, args.force)
-            state.setdefault(slug, {})["wiki_propagated"] = True
-            state[slug]["wiki_propagated_at"] = date.today().isoformat()
+            set_state(slug, "wiki_propagated", True)
+            set_state(slug, "wiki_propagated_at", date.today().isoformat())
             total_processed += processed
         except Exception as e:
             print(f"ERROR {slug}: {e}", file=sys.stderr)
 
-    save_state(state)
     print(f"Total wiki pages updated: {total_processed}")
     return 0
 

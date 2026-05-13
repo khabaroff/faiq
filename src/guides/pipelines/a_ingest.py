@@ -78,20 +78,6 @@ def slugify(text: str) -> str:
     return text[:80]
 
 
-def load_state(state_file: Path) -> dict:
-    if state_file.exists():
-        try:
-            return json.loads(state_file.read_text(encoding="utf-8"))
-        except Exception:
-            return {}
-    return {}
-
-
-def save_state(state_file: Path, state: dict) -> None:
-    state_file.parent.mkdir(parents=True, exist_ok=True)
-    state_file.write_text(json.dumps(state, ensure_ascii=False, indent=2), encoding="utf-8")
-
-
 def _archive_file(source_path: Path, done_dir: Path) -> Path:
     done_dir.mkdir(parents=True, exist_ok=True)
     target = done_dir / source_path.name
@@ -198,6 +184,8 @@ def process_item(item: QueueItem, settings: Settings, state: dict) -> dict | Non
 
 
 def main() -> int:
+    from guides.state import get_state, set_state, list_pending
+
     parser = argparse.ArgumentParser(description="Pipeline A: Ingest")
     parser.add_argument("--url", help="URL to ingest")
     parser.add_argument("--file", help="Local file to ingest")
@@ -205,8 +193,6 @@ def main() -> int:
     args = parser.parse_args()
 
     settings = Settings()
-    state_file = settings.data_dir / "state" / "index.json"
-    state = load_state(state_file)
 
     items = []
     if args.url:
@@ -231,11 +217,7 @@ def main() -> int:
         res = process_item(item, settings, state)
         if res:
             slug = res["slug"]
-            state[slug] = {
-                "raw": True, 
-                "source_type": res["source_type"],
-                "content_hash": res.get("content_hash")
-            }
+            set_state(slug, "raw", True)
             processed_count += 1
             print(f"Ingested: {slug} -> {res['path']}")
 
@@ -245,9 +227,6 @@ def main() -> int:
         p = Path(src_path)
         if p.exists():
             _archive_file(p, done_dir)
-
-    if processed_count > 0:
-        save_state(state_file, state)
 
     print(f"Done. Processed {processed_count} items.")
     return 0
