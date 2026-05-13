@@ -20,7 +20,7 @@ import yaml
 
 from guides.llm import call_llm, get_smart_client, load_prompt
 from guides.settings import Settings
-from guides.state import get_state, set_state
+from guides.state import get_state, set_state, update_frontmatter
 
 logger = logging.getLogger(__name__)
 
@@ -60,13 +60,13 @@ def _extract_json(text: str) -> dict:
 
 def _render_seo_prompt(fm: dict, body: str) -> str:
     prompt_template = load_prompt("seo.md")
-    
+
     # Simple extraction of TL;DR from body if present
     tldr = ""
     tldr_match = re.search(r"## TL;DR\n\n(.*?)(?=\n## |\Z)", body, re.DOTALL)
     if tldr_match:
         tldr = tldr_match.group(1).strip()
-    
+
     prompt = prompt_template
     prompt = prompt.replace("{{title}}", fm.get("title") or fm.get("slug") or "Untitled")
     prompt = prompt.replace("{{tldr}}", tldr)
@@ -74,16 +74,16 @@ def _render_seo_prompt(fm: dict, body: str) -> str:
     prompt = prompt.replace("{{tools}}", json.dumps(fm.get("tools", []), ensure_ascii=False))
     prompt = prompt.replace("{{patterns}}", json.dumps(fm.get("patterns", []), ensure_ascii=False))
     prompt = prompt.replace("{{source_url}}", fm.get("source_url", ""))
-    
+
     return prompt
 
 
 def call_llm_seo(fm: dict, body: str) -> dict:
     prompt = _render_seo_prompt(fm, body)
-    
+
     deployment = s.azure_deployment_fast or s.azure_deployment_smart
     system = "You are a technical SEO expert. Return only valid JSON as requested. No prose."
-    
+
     response, _ = call_llm(get_smart_client(), deployment, prompt, system)
     return _extract_json(response)
 
@@ -92,10 +92,10 @@ def optimize_one(slug: str) -> bool:
     summary_path = SUMMARIES_DIR / f"{slug}.md"
     if not summary_path.exists():
         return False
-    
+
     text = summary_path.read_text(encoding="utf-8")
     fm, body = parse_front_matter_yaml(text)
-    
+
     # Try to get title from source if not in summary fm
     if not fm.get("title"):
         source_path = SOURCES_DIR / f"{slug}.md"
@@ -106,13 +106,10 @@ def optimize_one(slug: str) -> bool:
     print(f"Optimizing SEO for: {slug}...")
     try:
         seo_meta = call_llm_seo(fm, body)
-        
+
         # Update frontmatter
-        fm.update(seo_meta)
-        
-        # Write back
-        fm_str = "---\n" + yaml.dump(fm, allow_unicode=True, default_flow_style=False) + "---\n\n"
-        summary_path.write_text(fm_str + body, encoding="utf-8")
+        seo_meta.setdefault("seo_optimized_at", date.today().isoformat())
+        update_frontmatter(summary_path, seo_meta)
         return True
     except Exception as e:
         logger.error("Failed SEO optimization for %s: %s", slug, e)
@@ -138,11 +135,10 @@ def main(argv=None) -> int:
         state = get_state(slug)
         if not args.force and state.get("seo_optimized"):
             continue
-            
+
         if optimize_one(slug):
             set_state(slug, "seo_optimized", True)
-            # We don't have a specific seo_optimized_at in set_state helpers yet, 
-            # but we can add it or just rely on the boolean for now.
+            set_state(slug, "status", "seo_optimized")
             processed_count += 1
             print(f"  → Optimized: {slug}")
 

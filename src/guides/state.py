@@ -2,9 +2,11 @@
 
 import json
 import sqlite3
-from datetime import date
+from datetime import date, datetime
 from pathlib import Path
 from typing import Any
+
+import yaml
 
 ROOT = Path(__file__).resolve().parent.parent.parent
 STATE_DIR = ROOT / "state"
@@ -20,32 +22,45 @@ def _get_conn() -> sqlite3.Connection:
 
 
 def init_db() -> None:
-    conn = _get_conn()
-    conn.execute(
-        """
-        CREATE TABLE IF NOT EXISTS articles (
-            slug TEXT PRIMARY KEY,
-            raw INTEGER DEFAULT 0,
-            content_hash TEXT,
-            summarized_at TEXT,
-            wiki_propagated INTEGER DEFAULT 0,
-            wiki_propagated_at TEXT,
-            seo_optimized INTEGER DEFAULT 0,
-            published_telegram TEXT,
-            quality TEXT,
-            quality_checked INTEGER DEFAULT 0
-        )
-        """
-    )
-    conn.commit()
-    # add columns that may be missing in older DBs
-    for col, definition in [("content_hash", "TEXT"), ("quality_checked", "INTEGER DEFAULT 0")]:
-        try:
-            conn.execute(f"ALTER TABLE articles ADD COLUMN {col} {definition}")
-            conn.commit()
-        except sqlite3.OperationalError:
-            pass  # column already exists
-    conn.close()
+     conn = _get_conn()
+     conn.execute(
+         """
+         CREATE TABLE IF NOT EXISTS articles (
+             slug TEXT PRIMARY KEY,
+             raw INTEGER DEFAULT 0,
+             content_hash TEXT,
+             summarized_at TEXT,
+             wiki_propagated INTEGER DEFAULT 0,
+             wiki_propagated_at TEXT,
+             seo_optimized INTEGER DEFAULT 0,
+             published_telegram TEXT,
+             quality TEXT,
+             quality_checked INTEGER DEFAULT 0,
+             status TEXT DEFAULT 'draft',
+             revision_count INTEGER DEFAULT 0,
+             last_edited_at TEXT,
+             last_edited_by TEXT,
+             compacted INTEGER DEFAULT 0
+         )
+         """
+     )
+     conn.commit()
+     # add columns that may be missing in older DBs
+     for col, definition in [
+         ("content_hash", "TEXT"),
+         ("quality_checked", "INTEGER DEFAULT 0"),
+         ("status", "TEXT DEFAULT 'draft'"),
+         ("revision_count", "INTEGER DEFAULT 0"),
+         ("last_edited_at", "TEXT"),
+         ("last_edited_by", "TEXT"),
+         ("compacted", "INTEGER DEFAULT 0"),
+     ]:
+         try:
+             conn.execute(f"ALTER TABLE articles ADD COLUMN {col} {definition}")
+             conn.commit()
+         except sqlite3.OperationalError:
+             pass  # column already exists
+     conn.close()
 
 
 def migrate_from_json() -> int:
@@ -97,14 +112,20 @@ def get_state(slug: str) -> dict[str, Any]:
         "published_telegram": row["published_telegram"],
         "quality": row["quality"],
         "quality_checked": bool(row["quality_checked"]),
+        "status": row["status"],
+        "revision_count": row["revision_count"],
+        "last_edited_at": row["last_edited_at"],
+        "last_edited_by": row["last_edited_by"],
+        "compacted": bool(row["compacted"]),
     }
 
 
 _VALID_FIELDS = frozenset({
-    "raw", "content_hash", "summarized_at", "wiki_propagated",
-    "wiki_propagated_at", "seo_optimized", "published_telegram",
-    "quality", "quality_checked",
-})
+     "raw", "content_hash", "summarized_at", "wiki_propagated",
+     "wiki_propagated_at", "seo_optimized", "published_telegram",
+     "quality", "quality_checked", "status", "revision_count",
+     "last_edited_at", "last_edited_by", "compacted",
+ })
 
 
 def set_state(slug: str, field: str, value: Any) -> None:
@@ -113,7 +134,7 @@ def set_state(slug: str, field: str, value: Any) -> None:
 
     conn = _get_conn()
 
-    if field in ("raw", "wiki_propagated", "seo_optimized", "quality_checked"):
+    if field in ("raw", "wiki_propagated", "seo_optimized", "quality_checked", "compacted"):
         value = 1 if value else 0
 
     conn.execute(
@@ -132,21 +153,69 @@ def find_by_content_hash(content_hash: str) -> str | None:
 
 
 def list_pending(stage: str) -> list[str]:
-    conn = _get_conn()
+     conn = _get_conn()
 
-    if stage == "raw":
-        rows = conn.execute("SELECT slug FROM articles WHERE raw = 0").fetchall()
-    elif stage == "summarized":
-        rows = conn.execute("SELECT slug FROM articles WHERE raw = 1 AND (summarized_at IS NULL OR summarized_at = '')").fetchall()
-    elif stage == "wiki_propagated":
-        rows = conn.execute("SELECT slug FROM articles WHERE summarized_at IS NOT NULL AND wiki_propagated = 0").fetchall()
-    elif stage == "seo_optimized":
-        rows = conn.execute("SELECT slug FROM articles WHERE wiki_propagated = 1 AND seo_optimized = 0").fetchall()
-    else:
-        rows = []
+     if stage == "raw":
+         rows = conn.execute("SELECT slug FROM articles WHERE raw = 0").fetchall()
+     elif stage == "summarized":
+         rows = conn.execute("SELECT slug FROM articles WHERE raw = 1 AND (summarized_at IS NULL OR summarized_at = '')").fetchall()
+     elif stage == "wiki_propagated":
+         rows = conn.execute("SELECT slug FROM articles WHERE summarized_at IS NOT NULL AND wiki_propagated = 0").fetchall()
+     elif stage == "seo_optimized":
+         rows = conn.execute("SELECT slug FROM articles WHERE wiki_propagated = 1 AND seo_optimized = 0").fetchall()
+     elif stage == "published":
+         rows = conn.execute("SELECT slug FROM articles WHERE seo_optimized = 1 AND published_telegram IS NULL").fetchall()
+     else:
+         rows = []
 
-    conn.close()
-    return [row["slug"] for row in rows]
+     conn.close()
+     return [row["slug"] for row in rows]
+
+
+def update_frontmatter(filepath: Path, updates: dict) -> None:
+     """Обновляет YAML frontmatter в .md файле, сохраняя тело."""
+     text = filepath.read_text(encoding="utf-8")
+     if not text.startswith("---"):
+         fm_str = "---\n" + yaml.dump(updates, allow_unicode=True, default_flow_style=False) + "---\n\n"
+         filepath.write_text(fm_str + text)
+         return
+
+     end = text.index("\n---\n", 4)
+     body = text[end + 5:]
+     try:
+         fm = yaml.safe_load(text[4:end]) or {}
+     except yaml.YAMLError:
+         fm = {}
+     fm.update(updates)
+     new_fm = yaml.dump(fm, default_flow_style=False, allow_unicode=True, sort_keys=False)
+     filepath.write_text(f"---\n{new_fm}---\n{body}")
+
+
+def set_status(slug: str, filepath: Path | None, status: str,
+               edited_by: str = "", filepath_for_fm: Path | None = None) -> None:
+     """Устанавливает status в SQLite и обновляет frontmatter .md файла."""
+     now = datetime.now().isoformat(timespec="seconds")
+     conn = _get_conn()
+     conn.execute(
+         "INSERT INTO articles (slug, status, last_edited_at, last_edited_by) "
+         "VALUES (?, ?, ?, ?) "
+         "ON CONFLICT(slug) DO UPDATE SET status = ?, last_edited_at = ?, last_edited_by = ?",
+         (slug, status, now, edited_by, status, now, edited_by),
+     )
+     conn.commit()
+     conn.close()
+
+     target = filepath_for_fm or filepath
+     if target:
+         update_frontmatter(target, {"status": status, "last_edited_at": now})
+         if edited_by:
+             # Читаем текущее fm чтобы добавить last_edited_by
+             _update_fm_field(target, "last_edited_by", edited_by)
+
+
+def _update_fm_field(filepath: Path, key: str, value: str) -> None:
+     """Обновляет одно поле в frontmatter."""
+     update_frontmatter(filepath, {key: value})
 
 
 def load_state_json() -> dict:

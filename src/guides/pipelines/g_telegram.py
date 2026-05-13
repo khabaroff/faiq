@@ -20,7 +20,7 @@ import yaml
 
 from guides.llm import call_llm, get_smart_client, load_prompt
 from guides.settings import Settings
-from guides.state import get_state, set_state
+from guides.state import get_state, set_state, update_frontmatter
 
 logger = logging.getLogger(__name__)
 
@@ -50,7 +50,7 @@ def parse_front_matter_yaml(text: str) -> tuple[dict, str]:
 
 def _render_telegram_prompt(fm: dict) -> str:
     prompt_template = load_prompt("telegram_post.md")
-    
+
     prompt = prompt_template
     prompt = prompt.replace("{{title}}", fm.get("title") or fm.get("slug") or "Untitled")
     prompt = prompt.replace("{{tldr}}", fm.get("seo_description") or "")
@@ -58,19 +58,19 @@ def _render_telegram_prompt(fm: dict) -> str:
     prompt = prompt.replace("{{tools}}", json.dumps(fm.get("tools", []), ensure_ascii=False))
     prompt = prompt.replace("{{patterns}}", json.dumps(fm.get("patterns", []), ensure_ascii=False))
     prompt = prompt.replace("{{source_url}}", fm.get("source_url", ""))
-    
+
     # summary_url is optional, could be constructed if site domain is known
     # For now, let's leave it empty or use a placeholder if needed
     prompt = prompt.replace("{{summary_url}}", "")
-    
+
     return prompt
 
 def call_llm_telegram(fm: dict) -> str:
     prompt = _render_telegram_prompt(fm)
-    
+
     deployment = s.azure_deployment_fast or s.azure_deployment_smart
     system = "You are a social media manager for a technical AI channel. Write a concise and engaging Telegram post. Follow the format exactly."
-    
+
     response, _ = call_llm(get_smart_client(), deployment, prompt, system)
     return response.strip()
 
@@ -78,14 +78,14 @@ def send_telegram_message(text: str) -> bool:
     if not s.telegram_bot_token or not s.telegram_channel_id:
         logger.error("TELEGRAM_BOT_TOKEN or TELEGRAM_CHANNEL_ID not set")
         return False
-    
+
     url = f"https://api.telegram.org/bot{s.telegram_bot_token}/sendMessage"
     payload = {
         "chat_id": s.telegram_channel_id,
         "text": text,
         "parse_mode": "Markdown"
     }
-    
+
     try:
         with httpx.Client(timeout=10.0) as client:
             resp = client.post(url, json=payload)
@@ -111,22 +111,24 @@ def publish_one(slug: str, dry_run: bool = False) -> bool:
     if not summary_path.exists():
         logger.error(f"Summary file not found: {summary_path}")
         return False
-    
+
     text = summary_path.read_text(encoding="utf-8")
     fm, _ = parse_front_matter_yaml(text)
-    
+
     print(f"Generating Telegram post for: {slug}...")
     try:
         post_content = call_llm_telegram(fm)
-        
+
         if dry_run:
             print("--- DRY RUN PREVIEW ---")
             print(post_content)
             print("-----------------------")
             return True
-        
+
         if send_telegram_message(post_content):
             set_state(slug, "published_telegram", datetime.now().isoformat())
+            set_state(slug, "status", "published")
+            update_frontmatter(summary_path, {"published_telegram": datetime.now().isoformat(), "status": "published"})
             return True
         return False
     except Exception as e:
@@ -154,7 +156,7 @@ def main(argv=None) -> int:
         state = get_state(slug)
         if not args.force and state.get("published_telegram"):
             continue
-            
+
         if publish_one(slug, dry_run=args.dry_run):
             processed_count += 1
             if not args.dry_run:

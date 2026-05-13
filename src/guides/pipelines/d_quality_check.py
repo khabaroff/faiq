@@ -19,7 +19,7 @@ from pathlib import Path
 
 from guides.llm import call_llm, get_smart_client, load_prompt
 from guides.settings import Settings
-from guides.state import get_state, set_state
+from guides.state import get_state, set_state, update_frontmatter
 
 logger = logging.getLogger(__name__)
 
@@ -158,6 +158,16 @@ def main(argv=None) -> int:
             set_state(slug, "quality_checked", True)
             if res.get("verdict"):
                 set_state(slug, "quality", res["verdict"])
+                if res["verdict"] == "ok":
+                    set_state(slug, "status", "quality_ok")
+
+    # Update frontmatter for all non-error results
+    for res in all_results:
+        if res.get("verdict") != "error":
+            slug = res["slug"]
+            summary_path = SUMMARIES_DIR / f"{slug}.md"
+            if summary_path.exists():
+                update_frontmatter(summary_path, {"status": "quality_ok" if res.get("verdict") == "ok" else "quality_needs_review"})
 
     QC_REPORT.parent.mkdir(parents=True, exist_ok=True)
     QC_REPORT.write_text(json.dumps({
@@ -170,5 +180,6 @@ def main(argv=None) -> int:
 
 
 if __name__ == "__main__":
-    logging.basicConfig(level=logging.INFO, format="%(levelname)s %(name)s: %(message)s")
+    from guides.log_setup import setup_logging
+    setup_logging()
     sys.exit(main())
