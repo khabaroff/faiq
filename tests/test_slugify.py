@@ -15,10 +15,8 @@ def test_slugify_agree_on_common_cases(text, expected_a, expected_c):
     assert slugify_c(text) == expected_c
 
 
-def test_slugify_underscore_divergence():
-    """Document known divergence: a_ingest strips _, c_wiki_update preserves."""
-    # This test documents the current behavior (NOT the desired behavior)
-    # Fix: unify into guides/utils/slugify.py (faiq-h2)
-    assert slugify_a("claude_code") == "claude-code"   # strips underscore
-    assert slugify_c("claude_code") == "claude_code"   # preserves underscore
-    # These should be the same after faiq-h2 is resolved
+def test_slugify_unified_underscore_handling():
+    """After faiq-h2: both pipelines use guides.utils.slugify — underscores stripped."""
+    assert slugify_a("claude_code") == "claude-code"
+    assert slugify_c("claude_code") == "claude-code"
+    assert slugify_a is slugify_c
