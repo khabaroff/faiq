@@ -6,6 +6,7 @@ from pathlib import Path
 import httpx
 
 from guides.fetch.base import FetchedContent, QueueItem, SourceType
+from guides.security.url_safety import validate_url
 
 
 def fetch_youtube(item: QueueItem) -> FetchedContent:
@@ -59,6 +60,10 @@ _TRANSCRIBE_BASE = "https://youtubetranscribe.khabaroff.studio"
 # returning plain text transcript
 
 def _try_transcribe_service(url: str) -> str | None:
+    try:
+        validate_url(url)
+    except ValueError:
+        return None
     try:
         resp = httpx.get(f"{_TRANSCRIBE_BASE}/transcript", params={"url": url}, timeout=120)
         if resp.status_code == 200 and resp.text.strip():
