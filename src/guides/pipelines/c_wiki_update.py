@@ -51,31 +51,35 @@ def slugify(name: str) -> str:
     return re.sub(r"[-\s]+", "-", s).strip("-")[:80]
 
 
-def canonicalize_slug(name: str, existing_slugs: list[str], item_type: str) -> str:
-    prompt = f"""Канонизируй slug для {item_type} с именем "{name}".
+def canonicalize_slug(name: str, existing_slugs: list[str], item_type: str = "") -> str:
+    """Map a name to existing slug using fuzzy match; LLM fallback only on near-collision."""
+    from rapidfuzz import process as fuzz_process, fuzz
 
-Существующие slugs в системе: {existing_slugs[:10] if existing_slugs else 'нет'}
+    candidate = slugify(name)
+    if not candidate:
+        return slugify(name) or name[:40].lower().replace(" ", "-")
 
-Верни JSON:
-{{"slug": "каноничный-slug", "reason": "краткое пояснение"}}
+    # Exact match wins immediately
+    if candidate in existing_slugs:
+        return candidate
 
-Правила:
-- Если имя точно совпадает с существующим slug — используй его
-- Если "{name}" может означать то же, что существующий slug — используй существующий
-- Иначе — создай новый slug на основе имени (только a-z, дефисы)
-- Не более 80 символов"""
+    # No existing slugs — just use candidate
+    if not existing_slugs:
+        return candidate
 
-    system = "Ты — эксперт по нормализации данных. Верни валидный JSON."
+    # Find best fuzzy match across ALL existing slugs (not capped at 10)
+    result = fuzz_process.extractOne(
+        candidate,
+        existing_slugs,
+        scorer=fuzz.token_sort_ratio,
+        score_cutoff=85,
+    )
+    if result is not None:
+        matched_slug, score, _ = result
+        return matched_slug
 
-    try:
-        response, _ = call_llm(get_smart_client(), s.azure_deployment_fast or s.azure_deployment_smart, prompt, system)
-        json_match = re.search(r"\{[\s\S]*\}", response)
-        if json_match:
-            result = json.loads(json_match.group())
-            return result.get("slug", slugify(name))
-    except Exception:
-        pass
-    return slugify(name)
+    # No close match → new slug
+    return candidate
 
 
 def extract_summary_fm(summary_md: str) -> tuple[list[str], list[str], str]:
