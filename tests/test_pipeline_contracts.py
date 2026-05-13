@@ -5,6 +5,16 @@ import unittest
 from guides.process.wiki import wrap_with_frontmatter
 
 
+def _body(text: str) -> str:
+    lines = text.splitlines()
+    end = None
+    for i in range(1, len(lines)):
+        if lines[i].strip() == "---":
+            end = i
+            break
+    return "\n".join(lines[end + 1 :]).strip() if end else text.strip()
+
+
 def _frontmatter_map(text: str) -> dict[str, str]:
     lines = text.splitlines()
     assert lines[0] == "---"
@@ -35,6 +45,29 @@ class WrapWithFrontmatterTests(unittest.TestCase):
 
         fm = _frontmatter_map(text)
         self.assertEqual(fm["title"], '"07 Prompts"')
+
+    def test_source_title_overrides_filename_like_heading_and_translates_sections(self) -> None:
+        body = "Here’s a concise summary of the article:\n\n## Core idea\n\nAnthropic argues this.\n\n### 1. Prompt chaining\n\nStep one."
+
+        text = wrap_with_frontmatter(
+            body,
+            source_type="article",
+            source_url="",
+            tags=[],
+            source_path="/tmp/05-alf-implementing-claude-code-skills-from-scratch.md",
+            source_title="Implementing Claude Code Skills from Scratch",
+            status="needs-review",
+        )
+
+        fm = _frontmatter_map(text)
+        body_text = _body(text)
+
+        self.assertEqual(fm["title"], '"Implementing Claude Code Skills from Scratch"')
+        self.assertTrue(body_text.startswith("# Implementing Claude Code Skills from Scratch"))
+        self.assertIn("## Ключевая идея", body_text)
+        self.assertNotIn("## Core idea", body_text)
+        self.assertIn("### 1. Цепочка промптов", body_text)
+        self.assertNotIn("Here’s a concise summary", body_text)
 
     def test_verified_status_updates_review_flags(self) -> None:
         text = wrap_with_frontmatter(

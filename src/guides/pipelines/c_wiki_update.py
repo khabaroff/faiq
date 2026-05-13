@@ -1,7 +1,7 @@
 """Pipeline C — Wiki Tools/Patterns Update.
 
 Вход: public/summaries/*.md где state[slug].wiki_propagated != true.
-Выход: public/tools/<tool-slug>.md + public/patterns/<pattern-slug>.md
+Выход: public/tools/<tool-slug>.md + public/techniques/<technique-slug>.md
       (create / append_mention / rewrite_description — решает LLM).
 
 Шаги:
@@ -40,7 +40,7 @@ ROOT = Path(__file__).resolve().parent.parent.parent.parent
 CONTENT_DIR = ROOT / "public"
 SUMMARIES_DIR = CONTENT_DIR / "summaries"
 WIKI_TOOLS_DIR = CONTENT_DIR / "tools"
-WIKI_TECH_DIR = CONTENT_DIR / "patterns"
+WIKI_TECH_DIR = CONTENT_DIR / "techniques"
 STATE_FILE = ROOT / "state" / "index.json"
 
 s = Settings()
