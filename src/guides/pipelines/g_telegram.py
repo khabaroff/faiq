@@ -33,7 +33,7 @@ SUMMARIES_DIR = CONTENT_DIR / "summaries"
 
 
 @_cache
-def _s() -> "Settings":
+def _s() -> Settings:
     return Settings()
 
 

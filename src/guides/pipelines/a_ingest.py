@@ -24,10 +24,10 @@ from pathlib import Path
 
 from guides.fetch.base import QueueItem, SourceKind, SourceType, detect_source_type
 from guides.fetch.github import fetch_github_gist, fetch_github_repo
+from guides.fetch.image_ocr import process_markdown_file
 from guides.fetch.image_vision import analyze_image, is_image
 from guides.fetch.pdf import fetch_pdf
 from guides.fetch.url import fetch_url
-from guides.fetch.image_ocr import process_markdown_file
 from guides.security.fs_safety import assert_safe_slug, safe_join
 from guides.settings import Settings
 from guides.state import find_by_content_hash, get_state, set_state, update_frontmatter
@@ -240,7 +240,7 @@ def process_item(item: QueueItem, settings: Settings) -> dict | None:
 
 
 def main(argv=None) -> int:
-    from guides.state import get_state, set_state, list_pending
+    from guides.state import get_state, list_pending, set_state
 
     parser = argparse.ArgumentParser(description="Pipeline A: Ingest")
     parser.add_argument("--url", help="URL to ingest")

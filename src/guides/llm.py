@@ -1,9 +1,10 @@
 import base64
 import logging
 import mimetypes
+from collections.abc import Sequence
 from functools import lru_cache
 from pathlib import Path
-from typing import Sequence, Any, NamedTuple
+from typing import Any, NamedTuple
 
 from openai import OpenAI
 

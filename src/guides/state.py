@@ -122,11 +122,16 @@ def get_state(slug: str) -> dict[str, Any]:
 
 
 _VALID_FIELDS = frozenset({
-     "raw", "content_hash", "summarized_at", "wiki_propagated",
-     "wiki_propagated_at", "seo_optimized", "published_telegram",
-     "quality", "quality_checked", "status", "revision_count",
-     "last_edited_at", "last_edited_by", "compacted",
- })
+    "raw", "content_hash", "summarized_at", "wiki_propagated",
+    "wiki_propagated_at", "seo_optimized", "published_telegram",
+    "quality", "quality_checked", "status", "revision_count",
+    "last_edited_at", "last_edited_by", "compacted",
+})
+
+_FIELD_SQL: dict[str, str] = {
+    f: f"INSERT INTO articles (slug, {f}) VALUES (?, ?) ON CONFLICT(slug) DO UPDATE SET {f} = ?"
+    for f in _VALID_FIELDS
+}
 
 
 def set_state(slug: str, field: str, value: Any) -> None:
@@ -138,10 +143,7 @@ def set_state(slug: str, field: str, value: Any) -> None:
     if field in ("raw", "wiki_propagated", "seo_optimized", "quality_checked", "compacted"):
         value = 1 if value else 0
 
-    conn.execute(
-        f"INSERT INTO articles (slug, {field}) VALUES (?, ?) ON CONFLICT(slug) DO UPDATE SET {field} = ?",
-        (slug, value, value),
-    )
+    conn.execute(_FIELD_SQL[field], (slug, value, value))
     conn.commit()
     conn.close()
 

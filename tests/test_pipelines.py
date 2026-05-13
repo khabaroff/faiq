@@ -22,12 +22,12 @@ class PipelineBTests(unittest.TestCase):
         self.assertEqual(b.parse_front_matter_simple("No FM"), ({}, "No FM"))
 
     def test_parse_front_matter_yaml(self):
+        from guides.frontmatter import parse_frontmatter
         text = "---\ntools:\n  - t1\npatterns: []\n---\nBody"
-        res = b.parse_front_matter_yaml(text)
-        self.assertIsNotNone(res)
-        fm, body = res
+        fm, body = parse_frontmatter(text)
         self.assertEqual(fm["tools"], ["t1"])
-        self.assertIsNone(b.parse_front_matter_yaml("---\n[invalid"))
+        fm_bad, _ = parse_frontmatter("---\n[invalid")
+        self.assertEqual(fm_bad, {})
 
     def test_validate_summary_md(self):
         self.assertTrue(b._validate_summary_md("---\ntools: []\npatterns: []\n---\nBody"))
@@ -71,7 +71,8 @@ class PipelineCTests(unittest.TestCase):
         self.assertEqual(c.extract_summary_fm(text), (["T1"], ["P1"], "u"))
 
     def test_parse_front_matter(self):
-        self.assertEqual(c.parse_front_matter("---\na: b\n---\nB"), ({"a": "b"}, "B"))
+        from guides.frontmatter import parse_frontmatter
+        self.assertEqual(parse_frontmatter("---\na: b\n---\nB"), ({"a": "b"}, "B"))
 
     def test_append_mention_to_page(self):
         from tempfile import NamedTemporaryFile
@@ -115,7 +116,8 @@ class PipelineCTests(unittest.TestCase):
 
 class PipelineETests(unittest.TestCase):
     def test_parse_front_matter_yaml(self):
-        self.assertEqual(e.parse_front_matter_yaml("---\na: b\n---\nB"), ({"a": "b"}, "B"))
+        from guides.frontmatter import parse_frontmatter
+        self.assertEqual(parse_frontmatter("---\na: b\n---\nB"), ({"a": "b"}, "B"))
 
     def test_extract_json(self):
         self.assertEqual(e._extract_json("{\"a\":1}"), {"a": 1})
@@ -140,11 +142,13 @@ class PipelineETests(unittest.TestCase):
     @patch("guides.pipelines.e_seo.load_prompt", return_value="prompt")
     def test_call_llm_seo(self, mock_load, mock_client, mock_call):
         mock_call.return_value = ("{\"seo_title\": \"T\"}", None)
-        self.assertEqual(e.call_llm_seo({}, "B"), {"seo_title": "T"})
+        result = e.call_llm_seo({}, "B")
+        self.assertEqual(result["seo_title"], "T")
 
 class PipelineGTests(unittest.TestCase):
     def test_parse_front_matter_yaml(self):
-        self.assertEqual(g.parse_front_matter_yaml("---\na: b\n---\nB"), ({"a": "b"}, "B"))
+        from guides.frontmatter import parse_frontmatter
+        self.assertEqual(parse_frontmatter("---\na: b\n---\nB"), ({"a": "b"}, "B"))
 
     def test_escape_markdown_v2(self):
         self.assertEqual(g._escape_markdown_v2("!"), "\\!")

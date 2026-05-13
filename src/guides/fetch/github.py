@@ -1,9 +1,8 @@
 import httpx
 
-from guides.settings import Settings
-
 from guides.fetch.base import FetchedContent, QueueItem, SourceType
 from guides.fetch.jina import get_jina_reader_headers, get_jina_reader_url, throttle_jina_reader
+from guides.settings import Settings
 
 
 def fetch_github_gist(item: QueueItem) -> FetchedContent:

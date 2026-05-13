@@ -34,7 +34,7 @@ SOURCES_DIR = CONTENT_DIR / "sources"
 
 
 @_cache
-def _s() -> "Settings":
+def _s() -> Settings:
     return Settings()
 
 

@@ -1,6 +1,6 @@
+import re
 import shutil
 import subprocess
-import re
 from pathlib import Path
 
 import httpx
@@ -59,7 +59,7 @@ def _try_defuddle(url: str) -> tuple[str, str] | None:
     cmd = shutil.which("defuddle") or shutil.which("defuddle-cli")
     if not cmd:
         try:
-            result = subprocess.run(["npx", "defuddle-cli", "parse", "--", url], capture_output=True, text=True, timeout=60)
+            result = subprocess.run(["npx", "-y", "defuddle-cli", "parse", url], capture_output=True, text=True, timeout=60)
             if result.returncode == 0 and len(result.stdout.strip()) > 200:
                 return result.stdout.strip(), "defuddle-npx"
         except Exception:

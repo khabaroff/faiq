@@ -39,7 +39,7 @@ from guides.tools.daily_log import append_log_entry
 
 
 @_cache
-def _s() -> "Settings":
+def _s() -> Settings:
     return Settings()
 
 ROOT = Path(__file__).resolve().parent.parent.parent.parent

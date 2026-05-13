@@ -62,13 +62,14 @@ def _backup_page(page_path: Path) -> None:
 
 
 @_cache
-def _s() -> "Settings":
+def _s() -> Settings:
     return Settings()
 
 
 def canonicalize_slug(name: str, existing_slugs: list[str], item_type: str = "") -> str:
     """Map a name to existing slug using fuzzy match; LLM fallback only on near-collision."""
-    from rapidfuzz import process as fuzz_process, fuzz
+    from rapidfuzz import fuzz
+    from rapidfuzz import process as fuzz_process
 
     candidate = slugify(name)
     if not candidate:
@@ -326,7 +327,7 @@ def propagate_summary(slug: str, force: bool = False) -> int:
 
 def main(argv=None) -> int:
     ap = argparse.ArgumentParser()
-    from guides.state import get_state, set_state, update_frontmatter, list_pending
+    from guides.state import get_state, list_pending, set_state, update_frontmatter
 
     ap.add_argument("--slug", help="single summary slug to propagate")
     ap.add_argument("--force", action="store_true", help="re-propagate even if already propagated")

@@ -2,8 +2,8 @@
 from __future__ import annotations
 
 import argparse
-import sys
 import logging
+import sys
 
 logger = logging.getLogger(__name__)
 
