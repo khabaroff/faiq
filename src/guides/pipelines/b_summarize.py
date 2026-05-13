@@ -184,6 +184,7 @@ def summarize_one(slug: str) -> Path:
         "source_url": src_fm.get("source_url", ""),
         "source_type": src_fm.get("source_type", "article"),
         "summarized_at": today,
+        "status": "reviewed",
         "tools": llm_fm.get("tools") or [],
         "patterns": llm_fm.get("patterns") or [],
         "key_claims": llm_fm.get("key_claims") or [],
@@ -229,6 +230,7 @@ def main(argv=None) -> int:
         try:
             out = summarize_one(slug)
             set_state(slug, "summarized_at", date.today().isoformat())
+            set_state(slug, "status", "reviewed")
             print(f"  → {out}")
             processed += 1
         except Exception as e:

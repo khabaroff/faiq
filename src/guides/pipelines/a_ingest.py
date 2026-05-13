@@ -29,7 +29,7 @@ from guides.fetch.pdf import fetch_pdf
 from guides.fetch.url import fetch_url
 from guides.fetch.image_ocr import process_markdown_file
 from guides.settings import Settings
-from guides.state import find_by_content_hash, get_state, set_state
+from guides.state import find_by_content_hash, get_state, set_state, update_frontmatter
 
 logger = logging.getLogger(__name__)
 
@@ -225,6 +225,7 @@ def process_item(item: QueueItem, settings: Settings) -> dict | None:
             "source_type": actual_type,
             "fetched_at": datetime.now().date().isoformat(),
             "lang": fetched.source_meta.get("lang", "en"),
+            "status": "draft",
         }
         yaml_block = "---\n" + "\n".join(f"{k}: {v}" for k, v in frontmatter.items()) + "\n---\n\n"
         out_path.write_text(yaml_block + raw_content, encoding="utf-8")

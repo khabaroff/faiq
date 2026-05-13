@@ -317,7 +317,7 @@ def propagate_summary(slug: str, force: bool = False) -> int:
 
 def main(argv=None) -> int:
     ap = argparse.ArgumentParser()
-    from guides.state import get_state, set_state, list_pending
+    from guides.state import get_state, set_state, update_frontmatter, list_pending
 
     ap.add_argument("--slug", help="single summary slug to propagate")
     ap.add_argument("--force", action="store_true", help="re-propagate even if already propagated")
@@ -345,6 +345,7 @@ def main(argv=None) -> int:
             processed = propagate_summary(slug, args.force)
             set_state(slug, "wiki_propagated", True)
             set_state(slug, "wiki_propagated_at", date.today().isoformat())
+            set_state(slug, "status", "propagated")
             total_processed += processed
         except Exception as e:
             print(f"ERROR {slug}: {e}", file=sys.stderr)
