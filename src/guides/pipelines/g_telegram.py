@@ -86,8 +86,9 @@ def send_telegram_message(text: str) -> bool:
             resp.raise_for_status()
         return True
     except Exception as e:
-        logger.error("Failed to send Telegram message: %s", e)
-        # Never send unescaped content as fallback; surface the error instead.
+        token = _s().telegram_bot_token or ""
+        safe_msg = str(e).replace(token, "<TOKEN>") if token else str(e)
+        logger.error("Failed to send Telegram message: %s", safe_msg)
         raise
 
 def publish_one(slug: str, dry_run: bool = False) -> bool:

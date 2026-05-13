@@ -1,13 +1,12 @@
 """Analyze images (posters, infographics) via LLM vision."""
 from __future__ import annotations
 
-import json
 import logging
-import re
 from pathlib import Path
 
 from guides.llm import call_llm_with_images, get_smart_client, load_prompt
 from guides.settings import Settings
+from guides.utils.json_extract import extract_first_json
 
 logger = logging.getLogger(__name__)
 
@@ -32,11 +31,7 @@ def analyze_image(image_path: Path) -> dict:
         system=system,
     )
 
-    match = re.search(r"\{[\s\S]*\}", response)
-    if not match:
-        raise ValueError(f"No JSON in vision response: {response[:300]}")
-
-    result = json.loads(match.group())
+    result = extract_first_json(response)
 
     logger.info(
         "image_analyzed",

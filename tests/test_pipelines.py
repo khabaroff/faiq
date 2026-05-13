@@ -11,8 +11,13 @@ import guides.pipelines.d_quality_check as d
 
 class PipelineBTests(unittest.TestCase):
     def test_count_tokens(self):
-        self.assertEqual(b.count_tokens("abcd"), 1)
-        self.assertEqual(b.count_tokens("a" * 40), 10)
+        self.assertGreater(b.count_tokens("abcd"), 0)
+        # tiktoken: "a"*40 is a few tokens, not exactly len//4
+        self.assertGreater(b.count_tokens("a" * 40), 0)
+        # Cyrillic should count more tokens than ASCII of same char count
+        ru = "а" * 40
+        en = "a" * 40
+        self.assertGreater(b.count_tokens(ru), b.count_tokens(en))
 
     def test_parse_front_matter_simple(self):
         text = "---\ntitle: Test\nkey: value\n---\nBody text"

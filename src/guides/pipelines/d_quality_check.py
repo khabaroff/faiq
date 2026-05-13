@@ -12,7 +12,6 @@ from __future__ import annotations
 import argparse
 import json
 import logging
-import re
 import sys
 from datetime import date
 from pathlib import Path
@@ -21,6 +20,7 @@ from guides.llm import call_llm, get_smart_client, load_prompt
 from guides.models import SummaryCheckResponse, WikiCleanResponse
 from guides.settings import Settings
 from guides.state import set_state, update_frontmatter
+from guides.utils.json_extract import extract_first_json
 
 logger = logging.getLogger(__name__)
 
@@ -35,11 +35,7 @@ TOOLS_DIR = PUBLIC_DIR / "tools"
 TECH_DIR = PUBLIC_DIR / "techniques"
 
 
-def _extract_json(text: str) -> dict:
-    match = re.search(r"\{[\s\S]*\}", text)
-    if not match:
-        raise ValueError(f"No JSON found in response: {text[:200]}")
-    return json.loads(match.group())
+_extract_json = extract_first_json
 
 
 def call_llm_summary_check(source_text: str, summary_text: str, slug: str) -> dict:

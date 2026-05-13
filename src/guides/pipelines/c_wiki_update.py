@@ -40,6 +40,7 @@ from guides.models import WikiUpdateResponse
 from guides.security.fs_safety import assert_safe_slug, safe_join
 from guides.settings import Settings
 from guides.tools.daily_log import append_log_entry
+from guides.utils.json_extract import extract_first_json
 from guides.utils.slugify import slugify
 
 logger = logging.getLogger(__name__)
@@ -136,11 +137,7 @@ def call_llm_update(slug: str, current_page_md: str, tool_name: str, tool_type: 
     deployment = _s().azure_deployment_fast or _s().azure_deployment_smart
     response, usage = call_llm(get_smart_client(), deployment, prompt, system)
 
-    json_match = re.search(r"\{[\s\S]*\}", response)
-    if not json_match:
-        raise ValueError(f"No JSON in LLM response: {response[:200]}")
-
-    parsed = WikiUpdateResponse.model_validate(json.loads(json_match.group()))
+    parsed = WikiUpdateResponse.model_validate(extract_first_json(response))
 
     if usage:
         append_log_entry(

@@ -6,7 +6,8 @@ from functools import lru_cache
 from pathlib import Path
 from typing import Any, NamedTuple
 
-from openai import OpenAI
+from openai import APIError, OpenAI, RateLimitError
+from tenacity import retry, retry_if_exception_type, stop_after_attempt, wait_exponential
 
 from guides.settings import Settings
 
@@ -84,20 +85,33 @@ def _record_usage(response, deployment: str) -> UsageRecord:
 def _extract_response_text(response) -> str:
     content = response.choices[0].message.content or ""
     if isinstance(content, str):
-        return content
+        text = content
+    else:
+        parts: list[str] = []
+        for item in content:
+            if isinstance(item, str):
+                parts.append(item)
+                continue
+            t = getattr(item, "text", None)
+            if t:
+                parts.append(t)
+                continue
+            if isinstance(item, dict) and item.get("type") == "text":
+                parts.append(item.get("text", ""))
+        text = "\n".join(part for part in parts if part)
+    if not text.strip():
+        raise ValueError("LLM returned empty response")
+    return text
 
-    parts: list[str] = []
-    for item in content:
-        if isinstance(item, str):
-            parts.append(item)
-            continue
-        text = getattr(item, "text", None)
-        if text:
-            parts.append(text)
-            continue
-        if isinstance(item, dict) and item.get("type") == "text":
-            parts.append(item.get("text", ""))
-    return "\n".join(part for part in parts if part)
+
+@retry(
+    retry=retry_if_exception_type((RateLimitError, APIError)),
+    wait=wait_exponential(multiplier=1, min=2, max=30),
+    stop=stop_after_attempt(3),
+    reraise=True,
+)
+def _chat_create(client: OpenAI, deployment: str, messages: list) -> Any:
+    return client.chat.completions.create(model=deployment, messages=messages)
 
 
 def call_llm(client: OpenAI, deployment: str, prompt: str, system: str = "") -> tuple[str, UsageRecord]:
@@ -105,7 +119,7 @@ def call_llm(client: OpenAI, deployment: str, prompt: str, system: str = "") -> 
     if system:
         messages.append({"role": "system", "content": system})
     messages.append({"role": "user", "content": prompt})
-    response = client.chat.completions.create(model=deployment, messages=messages)
+    response = _chat_create(client, deployment, messages)
     usage = _record_usage(response, deployment)
     return _extract_response_text(response), usage
 

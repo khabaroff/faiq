@@ -62,7 +62,12 @@ _CORRECTION = (
 )
 
 def count_tokens(text: str) -> int:
-    return len(text) // 4
+    try:
+        import tiktoken
+        enc = tiktoken.get_encoding("cl100k_base")
+        return len(enc.encode(text))
+    except Exception:
+        return len(text) // 2
 
 
 def parse_front_matter_simple(text: str) -> tuple[dict, str]:

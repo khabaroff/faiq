@@ -22,6 +22,7 @@ from guides.llm import call_llm, get_smart_client, load_prompt
 from guides.models import SeoResponse
 from guides.settings import Settings
 from guides.state import get_state, set_state, update_frontmatter
+from guides.utils.json_extract import extract_first_json
 
 logger = logging.getLogger(__name__)
 
@@ -36,11 +37,7 @@ def _s() -> Settings:
     return Settings()
 
 
-def _extract_json(text: str) -> dict:
-    match = re.search(r"\{[\s\S]*\}", text)
-    if not match:
-        raise ValueError(f"No JSON found in response: {text[:200]}")
-    return json.loads(match.group())
+_extract_json = extract_first_json
 
 
 def _render_seo_prompt(fm: dict, body: str) -> str:
