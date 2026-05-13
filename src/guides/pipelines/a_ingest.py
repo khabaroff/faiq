@@ -1,0 +1,242 @@
+"""Pipeline A — Ingest+Format.
+
+Input: URL, local file (.md, .pdf), or GitHub repo URL from data/inbox/.
+Output: content/sources/<slug>.md with YAML frontmatter.
+
+Workflow:
+  1. Detect source type.
+  2. Fetch content (clean MD, metadata).
+  3. OCR remote images (if article).
+  4. Save as content/sources/<slug>.md.
+  5. Move inbox file to data/inbox/done/.
+  6. Update state/index.json.
+"""
+from __future__ import annotations
+
+import argparse
+import hashlib
+import json
+import logging
+import re
+import sys
+from datetime import datetime
+from pathlib import Path
+
+from guides.fetch.base import QueueItem, SourceKind, SourceType, detect_source_type
+from guides.fetch.github import fetch_github_gist, fetch_github_repo
+from guides.fetch.pdf import fetch_pdf
+from guides.fetch.url import fetch_url
+from guides.fetch.image_ocr import process_markdown_file
+from guides.settings import Settings
+
+logger = logging.getLogger(__name__)
+
+
+_URL_RE = re.compile(r'^https?://\S+$')
+
+
+def _expand_file(f: Path) -> list[QueueItem]:
+    """Return URL QueueItems if file is URL list, else single FILE item."""
+    if f.suffix.lower() == ".pdf":
+        return [QueueItem(source=str(f), source_kind=SourceKind.FILE, received_at=datetime.now(), origin="inbox")]
+
+    try:
+        text = f.read_text(encoding="utf-8")
+    except Exception:
+        return [QueueItem(source=str(f), source_kind=SourceKind.FILE, received_at=datetime.now(), origin="inbox")]
+
+    urls = [line.strip() for line in text.splitlines() if _URL_RE.match(line.strip())]
+    non_url_lines = [l for l in text.splitlines() if l.strip() and not _URL_RE.match(l.strip())]
+
+    if urls and not non_url_lines:
+        # Pure URL list — one item per URL, archive source file after first
+        return [QueueItem(source=url, source_kind=SourceKind.URL, received_at=datetime.now(), origin=str(f)) for url in urls]
+
+    # Mixed or pure content — treat as file
+    return [QueueItem(source=str(f), source_kind=SourceKind.FILE, received_at=datetime.now(), origin="inbox")]
+
+
+def scan_inbox(inbox_dir: Path) -> list[QueueItem]:
+    if not inbox_dir.exists():
+        return []
+    items: list[QueueItem] = []
+    _TEXT_EXTENSIONS = {".md", ".txt", ".pdf"}
+    for f in sorted(inbox_dir.iterdir()):
+        if not f.is_file() or f.name.startswith("."):
+            continue
+        if f.suffix.lower() not in _TEXT_EXTENSIONS:
+            continue
+        items.extend(_expand_file(f))
+    return items
+
+
+def slugify(text: str) -> str:
+    # Remove non-word characters and lowercase
+    text = re.sub(r"[^\w\s-]", "", text.lower())
+    # Replace spaces/underscores with hyphens
+    text = re.sub(r"[-\s_]+", "-", text).strip("-")
+    return text[:80]
+
+
+def load_state(state_file: Path) -> dict:
+    if state_file.exists():
+        try:
+            return json.loads(state_file.read_text(encoding="utf-8"))
+        except Exception:
+            return {}
+    return {}
+
+
+def save_state(state_file: Path, state: dict) -> None:
+    state_file.parent.mkdir(parents=True, exist_ok=True)
+    state_file.write_text(json.dumps(state, ensure_ascii=False, indent=2), encoding="utf-8")
+
+
+def _archive_file(source_path: Path, done_dir: Path) -> Path:
+    done_dir.mkdir(parents=True, exist_ok=True)
+    target = done_dir / source_path.name
+    counter = 1
+    while target.exists():
+        target = done_dir / f"{source_path.stem}_{counter}{source_path.suffix}"
+        counter += 1
+    source_path.rename(target)
+    return target
+
+
+def process_item(item: QueueItem, settings: Settings) -> dict | None:
+    try:
+        source_type = detect_source_type(item)
+        is_pdf = item.source.lower().endswith(".pdf")
+        
+        # 1. Fetch
+        if is_pdf:
+            fetched = fetch_pdf(item)
+            actual_type = "pdf"
+        elif source_type == SourceType.GITHUB_REPO:
+            fetched = fetch_github_repo(item)
+            actual_type = "repo"
+        elif source_type == SourceType.GITHUB_GIST:
+            fetched = fetch_github_gist(item)
+            actual_type = "gist"
+        else:
+            fetched = fetch_url(item)
+            actual_type = "article"
+
+        if not fetched.raw_text.strip():
+            logger.warning("Empty content for %s", item.source)
+            return None
+
+        # 2. Slug & Title
+        title = fetched.source_meta.get("title") or Path(item.source).stem or "untitled"
+        slug = slugify(title)
+        if not slug:
+            slug = hashlib.md5(item.source.encode()).hexdigest()[:8]
+
+        # 3. Save temp for OCR
+        content_sources_dir = settings.data_dir.parent / "public" / "sources"
+        content_sources_dir.mkdir(parents=True, exist_ok=True)
+        out_path = content_sources_dir / f"{slug}.md"
+        
+        # Initial write
+        out_path.write_text(fetched.raw_text, encoding="utf-8")
+
+        # 4. OCR images (only for articles/gists, repos usually have internal images)
+        if actual_type in ("article", "gist"):
+            process_markdown_file(out_path)
+
+        # 5. Add YAML Frontmatter
+        raw_content = out_path.read_text(encoding="utf-8")
+        # Remove any existing frontmatter if fetcher added it (like defuddle might)
+        if raw_content.startswith("---"):
+            match = re.match(r"^---.*?---\n", raw_content, re.DOTALL)
+            if match:
+                raw_content = raw_content[match.end():].lstrip()
+
+        # source_url: prefer fetched meta url, then item URL, then frontmatter of original file
+        source_url = fetched.source_meta.get("url", "")
+        if not source_url and item.source_kind == SourceKind.URL:
+            source_url = item.source
+        if not source_url and item.source_kind == SourceKind.FILE:
+            # Try reading source_url from frontmatter of the dropped .md
+            _fm_match = re.search(r'^source_url:\s*(\S+)', Path(item.source).read_text(encoding="utf-8"), re.MULTILINE)
+            if _fm_match:
+                source_url = _fm_match.group(1)
+
+        frontmatter = {
+            "title": title,
+            "slug": slug,
+            "source_url": source_url,
+            "source_type": actual_type,
+            "fetched_at": datetime.now().date().isoformat(),
+            "lang": fetched.source_meta.get("lang", "en"),
+        }
+        yaml_block = "---\n" + "\n".join(f"{k}: {v}" for k, v in frontmatter.items()) + "\n---\n\n"
+        out_path.write_text(yaml_block + raw_content, encoding="utf-8")
+
+        # 6. Archive
+        if item.source_kind == SourceKind.FILE:
+            _archive_file(Path(item.source), settings.data_dir / "inbox" / "done")
+
+        return {"slug": slug, "source_type": actual_type, "path": out_path}
+
+    except Exception as e:
+        logger.exception("Failed to ingest %s: %s", item.source, e)
+        return None
+
+
+def main() -> int:
+    parser = argparse.ArgumentParser(description="Pipeline A: Ingest")
+    parser.add_argument("--url", help="URL to ingest")
+    parser.add_argument("--file", help="Local file to ingest")
+    parser.add_argument("--repo", help="GitHub repo to ingest")
+    args = parser.parse_args()
+
+    settings = Settings()
+    state_file = settings.data_dir / "state" / "index.json"
+    state = load_state(state_file)
+
+    items = []
+    if args.url:
+        items.append(QueueItem(source=args.url, source_kind=SourceKind.URL, received_at=datetime.now(), origin="cli"))
+    elif args.file:
+        items.append(QueueItem(source=args.file, source_kind=SourceKind.FILE, received_at=datetime.now(), origin="cli"))
+    elif args.repo:
+        items.append(QueueItem(source=args.repo, source_kind=SourceKind.URL, received_at=datetime.now(), origin="cli"))
+    else:
+        # Batch mode: scan inbox
+        inbox_dir = settings.data_dir / "inbox"
+        items = scan_inbox(inbox_dir)
+
+    # Track which source files (URL-lists) to archive after all their URLs are processed
+    url_list_files: set[str] = set()
+    for item in items:
+        if item.source_kind == SourceKind.URL and item.origin not in ("cli", "inbox"):
+            url_list_files.add(item.origin)
+
+    processed_count = 0
+    for item in items:
+        res = process_item(item, settings)
+        if res:
+            slug = res["slug"]
+            state[slug] = {"raw": True, "source_type": res["source_type"]}
+            processed_count += 1
+            print(f"Ingested: {slug} -> {res['path']}")
+
+    # Archive URL-list source files after all items processed
+    done_dir = settings.data_dir / "inbox" / "done"
+    for src_path in url_list_files:
+        p = Path(src_path)
+        if p.exists():
+            _archive_file(p, done_dir)
+
+    if processed_count > 0:
+        save_state(state_file, state)
+
+    print(f"Done. Processed {processed_count} items.")
+    return 0
+
+
+if __name__ == "__main__":
+    from guides.log_setup import setup_logging
+    setup_logging()
+    sys.exit(main())
