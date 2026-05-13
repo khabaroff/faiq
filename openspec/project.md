@@ -19,12 +19,12 @@ Guides — система подготовки лекционного матер
 
 ```
 data/inbox/ → Pipeline A → public/sources/*.md
-                         → Pipeline B → public/summaries/*.md
-                                      → Pipeline C → public/tools/*.md
-                                                    public/patterns/*.md
-                                                  → Pipeline D (QualityBot)
-                                                  → Pipeline E (SEO, planned)
-                                                  → Pipeline G (Telegram, planned)
+                          → Pipeline B → public/summaries/*.md
+                                       → Pipeline C → public/tools/*.md
+                                                     public/patterns/*.md
+                                                   → Pipeline D (QualityBot)
+                                                   → Pipeline E (SEO Optimizer)
+                                                   → Pipeline G (Telegram Publisher)
 ```
 
 Состояние: `state/index.json` — плоский JSON, ключ = slug.
@@ -57,6 +57,12 @@ key_claims:
 lecture_hooks:
   - вопрос для аудитории
 quality: ok | needs_review   # needs_review = LLM не справился 3x
+# После Pipeline E:
+seo_title: "..."          # ≤60 символов
+seo_description: "..."    # ≤160 символов
+og_description: "..."
+# После Pipeline G:
+published_telegram: "2026-05-13T14:00:00"
 ---
 ```
 

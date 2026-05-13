@@ -168,6 +168,5 @@ def main() -> int:
 
 
 if __name__ == "__main__":
-    from guides.log_setup import setup_logging
-    setup_logging()
+    logging.basicConfig(level=logging.INFO, format="%(levelname)s %(name)s: %(message)s")
     sys.exit(main())

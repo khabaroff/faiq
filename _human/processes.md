@@ -58,13 +58,37 @@ flowchart TD
         D3[починить или пометить]
     end
 
-    ROBOT_D -->|✅ ok / 🔧 cleaned| TOOLS
-    ROBOT_D -->|✅ ok / ♻️ needs_resummarize| SUMMARIES
+ROBOT_D -->|✅ ok / 🔧 cleaned| TOOLS
+     ROBOT_D -->|✅ ok / ♻️ needs_resummarize| SUMMARIES
 
-    TOOLS --> PUB
-    TECH --> PUB
-    SUMMARIES --> PUB
-    SOURCES --> PUB
+     SUMMARIES --> ROBOT_E
+
+     subgraph ROBOT_E["🤖 Robot E — SEO Optimizer"]
+         E1[прочитать summary]
+         E2[LLM → seo_title + seo_description]
+         E3[обновить frontmatter]
+         E1 --> E2 --> E3
+     end
+
+     ROBOT_E -->|public/summaries/<slug>.md| SUMMARIES
+
+     SUMMARIES --> ROBOT_G
+     TOOLS --> ROBOT_G
+     TECH --> ROBOT_G
+
+     subgraph ROBOT_G["🤖 Robot G — Telegram Publisher"]
+         G1[следить за новыми summaries]
+         G2[LLM → пост для канала]
+         G3[отправить в Telegram]
+         G1 --> G2 --> G3
+     end
+
+     ROBOT_G -->|published_telegram| SUMMARIES
+
+     TOOLS --> PUB
+     TECH --> PUB
+     SUMMARIES --> PUB
+     SOURCES --> PUB
 
     subgraph PUB["📖 Публикация"]
         OBS[Obsidian Vault]
@@ -161,28 +185,26 @@ lecture_hooks:
 
 ---
 
-### Robot E — SEO Optimizer (planned, guides-j7w)
+### Robot E — SEO Optimizer
 
-**Запуск:** `python -m guides.pipelines.e_seo`  
-**Триггер:** после C  
-**Модель:** gpt-5.4-mini  
+**Запуск:** `python -m guides.pipelines.e_seo`
+**Триггер:** новые файлы в `public/summaries/`
+**Идемпотентен:** да (`state[slug].seo_optimized`)
+
+**Модель:** gpt-5.4-mini
 **Промпт:** `prompts/seo.md`
 
-Добавляет в frontmatter саммари: `seo_title` (≤60 символов), `seo_description` (≤160 символов), `og_description`. Используется Quartz/Astro для `<head>` мета-тегов.
+Генерирует SEO-поля для frontmatter саммари: `seo_title` (≤60 символов), `seo_description` (≤160 символов), `og_description`. Используется Quartz/Astro для `<head>` мета-тегов.
 
 ---
 
-### Robot F — Link Checker (planned, guides-b2z)
+### Robot G — Telegram Publisher
 
-**Запуск:** `python -m guides.pipelines.f_link_check`  
-Сканирует `[[wikilinks]]` в summaries/tools/patterns, репортит битые ссылки (нет соответствующего файла). Опционально создаёт stub-страницы.
+**Запуск:** `python -m guides.pipelines.g_telegram`
+**Триггер:** новые файлы в `public/summaries/` без `published_telegram`
+**Идемпотентен:** да (`state[slug].published_telegram`)
 
----
-
-### Robot G — Telegram Publisher (planned, guides-3ad)
-
-**Запуск:** `python -m guides.pipelines.g_telegram`  
-**Промпт:** `prompts/telegram_post.md`  
+**Промпт:** `prompts/telegram_post.md`
 **Config:** `TELEGRAM_BOT_TOKEN` + `TELEGRAM_CHANNEL_ID` в `.env`
 
 Постит одну статью за раз в канал: bold заголовок + tldr + 2-3 тезиса + ссылки. Ставит `state[slug].published_telegram = ISO date`. `--dry-run` для превью без публикации.

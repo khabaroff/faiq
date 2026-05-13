@@ -20,30 +20,16 @@ import yaml
 
 from guides.llm import call_llm, get_smart_client, load_prompt
 from guides.settings import Settings
+from guides.state import get_state, set_state
 
 logger = logging.getLogger(__name__)
 
 ROOT = Path.cwd()
-STATE_FILE = ROOT / "state" / "index.json"
 CONTENT_DIR = ROOT / "public"
 SUMMARIES_DIR = CONTENT_DIR / "summaries"
 SOURCES_DIR = CONTENT_DIR / "sources"
 
 s = Settings()
-
-
-def load_state() -> dict:
-    if STATE_FILE.exists():
-        try:
-            return json.loads(STATE_FILE.read_text(encoding="utf-8"))
-        except Exception:
-            return {}
-    return {}
-
-
-def save_state(state: dict) -> None:
-    STATE_FILE.parent.mkdir(parents=True, exist_ok=True)
-    STATE_FILE.write_text(json.dumps(state, ensure_ascii=False, indent=2), encoding="utf-8")
 
 
 def parse_front_matter_yaml(text: str) -> tuple[dict, str]:
@@ -139,8 +125,6 @@ def main() -> int:
     parser.add_argument("--force", action="store_true", help="Reprocess even if optimized")
     args = parser.parse_args()
 
-    state = load_state()
-    
     if args.slug:
         slugs = [args.slug]
     else:
@@ -151,23 +135,21 @@ def main() -> int:
 
     processed_count = 0
     for slug in slugs:
-        if not args.force and state.get(slug, {}).get("seo_optimized"):
+        state = get_state(slug)
+        if not args.force and state.get("seo_optimized"):
             continue
             
         if optimize_one(slug):
-            state.setdefault(slug, {})["seo_optimized"] = True
-            state[slug]["seo_optimized_at"] = date.today().isoformat()
+            set_state(slug, "seo_optimized", True)
+            # We don't have a specific seo_optimized_at in set_state helpers yet, 
+            # but we can add it or just rely on the boolean for now.
             processed_count += 1
             print(f"  → Optimized: {slug}")
-
-    if processed_count > 0:
-        save_state(state)
 
     print(f"Done. Processed {processed_count} summaries.")
     return 0
 
 
 if __name__ == "__main__":
-    from guides.log_setup import setup_logging
-    setup_logging()
+    logging.basicConfig(level=logging.INFO, format="%(levelname)s %(name)s: %(message)s")
     sys.exit(main())

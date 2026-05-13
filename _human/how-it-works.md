@@ -98,6 +98,15 @@ python -m guides.pipelines.c_wiki_update
 
 # Проверка качества (дешёвая модель)
 python -m guides.pipelines.d_quality_check
+
+# SEO-оптимизация (добавляет seo_title, seo_description, og_description)
+python -m guides.pipelines.e_seo
+
+# Публикация в Telegram-канал
+python -m guides.pipelines.g_telegram
+
+# Всё сразу (A → B → C → D → E → G)
+python -m guides.pipelines.run_all
 ```
 
 ---
@@ -143,9 +152,20 @@ lecture_hooks:
 
 После прогона через Pipeline E добавляются SEO-поля:
 ```yaml
+slug: building-effective-ai-agents
+source_url: https://...
+source_type: article
+summarized_at: 2026-05-13
 seo_title: "Строим агентов на Claude Code — паттерны и инструменты"
 seo_description: "Разбор Context Engineering, ReAct и практик построения AI-агентов. 22 конкретных тезиса."
 og_description: "Саммари статьи Anthropic про паттерны агентов."
+tools: [Claude Code, LangChain]
+patterns: [Context Engineering, ReAct]
+key_claims:
+  - главный тезис 1
+lecture_hooks:
+  - провокационный вопрос для аудитории
+---
 ```
 
 После публикации в Telegram:

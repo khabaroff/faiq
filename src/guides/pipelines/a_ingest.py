@@ -28,6 +28,7 @@ from guides.fetch.pdf import fetch_pdf
 from guides.fetch.url import fetch_url
 from guides.fetch.image_ocr import process_markdown_file
 from guides.settings import Settings
+from guides.state import get_state, set_state
 
 logger = logging.getLogger(__name__)
 
@@ -214,10 +215,22 @@ def main() -> int:
 
     processed_count = 0
     for item in items:
-        res = process_item(item, settings, state)
+        # For hash-based dedup, we need a view of all current states.
+        # Since we migrated to SQLite, we could either fetch all or just rely on set_state.
+        # The existing process_item expects a 'state' dict for dedup check.
+        # Let's provide a minimal one or refactor process_item to use SQLite directly.
+        from guides.state import _get_conn
+        conn = _get_conn()
+        all_rows = conn.execute("SELECT slug, content_hash FROM articles").fetchall()
+        current_state = {r["slug"]: {"content_hash": r["content_hash"]} for r in all_rows}
+        conn.close()
+
+        res = process_item(item, settings, current_state)
         if res:
             slug = res["slug"]
             set_state(slug, "raw", True)
+            if res.get("content_hash"):
+                set_state(slug, "content_hash", res["content_hash"])
             processed_count += 1
             print(f"Ingested: {slug} -> {res['path']}")
 
@@ -233,6 +246,5 @@ def main() -> int:
 
 
 if __name__ == "__main__":
-    from guides.log_setup import setup_logging
-    setup_logging()
+    logging.basicConfig(level=logging.INFO, format="%(levelname)s %(name)s: %(message)s")
     sys.exit(main())
