@@ -1,62 +1,63 @@
 from __future__ import annotations
 
-import json
 import unittest
-from datetime import datetime, timezone
+from datetime import datetime
 from pathlib import Path
 from tempfile import TemporaryDirectory
+from unittest.mock import patch
 
-from guides.vault import _append_wiki_log
+from guides.tools.daily_log import append_log_entry
 
 
-class WikiLogTests(unittest.TestCase):
-    def test_append_wiki_log_groups_by_day_and_shows_spend(self) -> None:
-        today = datetime.utcnow().date().isoformat()
-
+class DailyLogTests(unittest.TestCase):
+    def test_creates_file_with_header_on_first_call(self) -> None:
         with TemporaryDirectory() as tmpdir:
-            root = Path(tmpdir)
-            wiki_dir = root / "wiki"
-            data_logs = root / "data" / "logs"
-            data_logs.mkdir(parents=True, exist_ok=True)
-            (wiki_dir / "log.md").parent.mkdir(parents=True, exist_ok=True)
-            (wiki_dir / "log.md").write_text("# Log\n", encoding="utf-8")
+            log_path = Path(tmpdir) / "2026-05-13.md"
 
-            pipeline_log = data_logs / "pipeline.log"
-            pipeline_log.write_text(
-                "\n".join(
-                    [
-                        json.dumps(
-                            {
-                                "ts": f"{today}T10:00:00Z",
-                                "logger": "guides.llm",
-                                "msg": "llm_call",
-                                "cost_usd": 0.123456,
-                            },
-                            ensure_ascii=False,
-                        ),
-                        json.dumps(
-                            {
-                                "ts": f"{today}T10:05:00Z",
-                                "logger": "guides.llm",
-                                "msg": "llm_call",
-                                "cost_usd": 0.100000,
-                            },
-                            ensure_ascii=False,
-                        ),
-                    ]
-                )
-                + "\n",
-                encoding="utf-8",
-            )
+            with patch("guides.tools.daily_log._get_log_path", return_value=log_path):
+                append_log_entry("test-slug", "summary", "gpt-5.4", 1000, 500, 0.01)
 
-            _append_wiki_log(wiki_dir, "First Page", "notes", "first-page")
-            _append_wiki_log(wiki_dir, "Second Page", "articles", "second-page")
+            self.assertTrue(log_path.exists())
+            content = log_path.read_text(encoding="utf-8")
+            self.assertIn("# Daily Pipeline Log", content)
+            self.assertIn("| slug | action | model | tokens | cost | time |", content)
+            self.assertIn("Total cost:", content)
 
-            text = (wiki_dir / "log.md").read_text(encoding="utf-8")
+    def test_accumulates_total_cost_on_multiple_calls(self) -> None:
+        with TemporaryDirectory() as tmpdir:
+            log_path = Path(tmpdir) / "2026-05-13.md"
 
-            self.assertIn(f"## {today} | spent: $0.223456", text)
-            self.assertIn("- ingest | First Page -> wiki/extracts/notes/first-page.md", text)
-            self.assertIn("- ingest | Second Page -> wiki/extracts/articles/second-page.md", text)
+            with patch("guides.tools.daily_log._get_log_path", return_value=log_path):
+                append_log_entry("slug-1", "summary", "gpt-5.4", 1000, 500, 0.01)
+                append_log_entry("slug-2", "wiki_tool", "azure-mini", 500, 200, 0.005)
+
+            content = log_path.read_text(encoding="utf-8")
+
+            self.assertEqual(content.count("Total cost:"), 1)
+            self.assertIn("Total cost: $0.0150", content)
+            self.assertIn("| slug-1 |", content)
+            self.assertIn("| slug-2 |", content)
+
+    def test_per_day_naming(self) -> None:
+        with TemporaryDirectory() as tmpdir:
+            log_path_1 = Path(tmpdir) / "2026-05-13.md"
+            log_path_2 = Path(tmpdir) / "2026-05-14.md"
+
+            with patch("guides.tools.daily_log._get_log_path") as mock_path:
+                mock_path.return_value = log_path_1
+                append_log_entry("slug-1", "summary", "gpt-5.4", 1000, 500, 0.01)
+
+                mock_path.return_value = log_path_2
+                append_log_entry("slug-2", "summary", "gpt-5.4", 2000, 1000, 0.02)
+
+            self.assertTrue(log_path_1.exists())
+            self.assertTrue(log_path_2.exists())
+
+            content_1 = log_path_1.read_text(encoding="utf-8")
+            content_2 = log_path_2.read_text(encoding="utf-8")
+
+            self.assertIn("Total cost: $0.0100", content_1)
+            self.assertIn("Total cost: $0.0200", content_2)
 
 
 if __name__ == "__main__":

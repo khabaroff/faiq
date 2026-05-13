@@ -103,7 +103,7 @@ def _archive_file(source_path: Path, done_dir: Path) -> Path:
     return target
 
 
-def process_item(item: QueueItem, settings: Settings) -> dict | None:
+def process_item(item: QueueItem, settings: Settings, state: dict) -> dict | None:
     try:
         source_type = detect_source_type(item)
         is_pdf = item.source.lower().endswith(".pdf")
@@ -125,6 +125,16 @@ def process_item(item: QueueItem, settings: Settings) -> dict | None:
         if not fetched.raw_text.strip():
             logger.warning("Empty content for %s", item.source)
             return None
+
+        # 1a. Content Dedup (SHA256)
+        content_hash = hashlib.sha256(fetched.raw_text.encode("utf-8")).hexdigest()
+        for existing_slug, data in state.items():
+            if data.get("content_hash") == content_hash:
+                print(f"skip (already ingested): {item.source} -> content_hash matches {existing_slug}")
+                # We still want to archive the file if it's already ingested
+                if item.source_kind == SourceKind.FILE:
+                    _archive_file(Path(item.source), settings.data_dir / "inbox" / "done")
+                return None
 
         # 2. Slug & Title
         title = fetched.source_meta.get("title") or Path(item.source).stem or "untitled"
@@ -158,9 +168,12 @@ def process_item(item: QueueItem, settings: Settings) -> dict | None:
             source_url = item.source
         if not source_url and item.source_kind == SourceKind.FILE:
             # Try reading source_url from frontmatter of the dropped .md
-            _fm_match = re.search(r'^source_url:\s*(\S+)', Path(item.source).read_text(encoding="utf-8"), re.MULTILINE)
-            if _fm_match:
-                source_url = _fm_match.group(1)
+            try:
+                _fm_match = re.search(r'^source_url:\s*(\S+)', Path(item.source).read_text(encoding="utf-8"), re.MULTILINE)
+                if _fm_match:
+                    source_url = _fm_match.group(1)
+            except Exception:
+                pass
 
         frontmatter = {
             "title": title,
@@ -177,7 +190,7 @@ def process_item(item: QueueItem, settings: Settings) -> dict | None:
         if item.source_kind == SourceKind.FILE:
             _archive_file(Path(item.source), settings.data_dir / "inbox" / "done")
 
-        return {"slug": slug, "source_type": actual_type, "path": out_path}
+        return {"slug": slug, "source_type": actual_type, "path": out_path, "content_hash": content_hash}
 
     except Exception as e:
         logger.exception("Failed to ingest %s: %s", item.source, e)
@@ -215,10 +228,14 @@ def main() -> int:
 
     processed_count = 0
     for item in items:
-        res = process_item(item, settings)
+        res = process_item(item, settings, state)
         if res:
             slug = res["slug"]
-            state[slug] = {"raw": True, "source_type": res["source_type"]}
+            state[slug] = {
+                "raw": True, 
+                "source_type": res["source_type"],
+                "content_hash": res.get("content_hash")
+            }
             processed_count += 1
             print(f"Ingested: {slug} -> {res['path']}")
 
