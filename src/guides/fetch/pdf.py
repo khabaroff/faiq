@@ -11,6 +11,13 @@ PDF_OCR_SYSTEM = "You are an OCR engine. Extract all readable text from the PDF 
 PDF_OCR_PROMPT = "Extract all readable text from this PDF page in reading order. Do not summarize."
 
 
+def _validate_path(path: Path) -> Path:
+    """Reject paths starting with - to prevent flag injection."""
+    if str(path.name).startswith("-"):
+        raise ValueError(f"Suspicious path rejected: {path}")
+    return path
+
+
 def fetch_pdf(item: QueueItem) -> FetchedContent:
     text = _extract_pdf_text(item.source)
     if _has_usable_pdf_text(text):
@@ -37,8 +44,9 @@ def fetch_pdf(item: QueueItem) -> FetchedContent:
 
 def _extract_pdf_text(pdf_path: str) -> str:
     try:
+        _validate_path(Path(pdf_path))
         result = subprocess.run(
-            ["pdftotext", pdf_path, "-"],
+            ["pdftotext", "--", pdf_path, "-"],
             capture_output=True,
             text=True,
             timeout=60,
@@ -71,8 +79,9 @@ def _render_pdf_pages(pdf_path: str) -> list[Path]:
     temp_dir = Path(tempfile.mkdtemp(prefix="guides-pdf-ocr-"))
     output_prefix = temp_dir / "page"
     try:
+        _validate_path(Path(pdf_path))
         result = subprocess.run(
-            ["pdftoppm", "-png", "-r", "144", pdf_path, str(output_prefix)],
+            ["pdftoppm", "-png", "-r", "144", "--", pdf_path, str(output_prefix)],
             capture_output=True,
             text=True,
             timeout=120,
