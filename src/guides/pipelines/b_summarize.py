@@ -200,14 +200,14 @@ def summarize_one(slug: str) -> Path:
     return out
 
 
-def main() -> int:
+def main(argv=None) -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("--slug", help="single slug to summarize")
     ap.add_argument("--force", action="store_true", help="re-summarize even if exists")
     ap.add_argument("--batch", type=int, default=0, help="limit to N items (0 = all)")
     from guides.state import get_state, set_state, list_pending
 
-    args = ap.parse_args()
+    args = ap.parse_args(argv)
 
     if args.slug:
         slugs = [args.slug]

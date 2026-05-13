@@ -28,7 +28,7 @@ from guides.fetch.pdf import fetch_pdf
 from guides.fetch.url import fetch_url
 from guides.fetch.image_ocr import process_markdown_file
 from guides.settings import Settings
-from guides.state import get_state, set_state
+from guides.state import find_by_content_hash, get_state, set_state
 
 logger = logging.getLogger(__name__)
 
@@ -90,7 +90,7 @@ def _archive_file(source_path: Path, done_dir: Path) -> Path:
     return target
 
 
-def process_item(item: QueueItem, settings: Settings, state: dict) -> dict | None:
+def process_item(item: QueueItem, settings: Settings) -> dict | None:
     try:
         source_type = detect_source_type(item)
         is_pdf = item.source.lower().endswith(".pdf")
@@ -115,13 +115,12 @@ def process_item(item: QueueItem, settings: Settings, state: dict) -> dict | Non
 
         # 1a. Content Dedup (SHA256)
         content_hash = hashlib.sha256(fetched.raw_text.encode("utf-8")).hexdigest()
-        for existing_slug, data in state.items():
-            if data.get("content_hash") == content_hash:
-                print(f"skip (already ingested): {item.source} -> content_hash matches {existing_slug}")
-                # We still want to archive the file if it's already ingested
-                if item.source_kind == SourceKind.FILE:
-                    _archive_file(Path(item.source), settings.data_dir / "inbox" / "done")
-                return None
+        existing_slug = find_by_content_hash(content_hash)
+        if existing_slug:
+            print(f"skip (already ingested): {item.source} -> content_hash matches {existing_slug}")
+            if item.source_kind == SourceKind.FILE:
+                _archive_file(Path(item.source), settings.data_dir / "inbox" / "done")
+            return None
 
         # 2. Slug & Title
         title = fetched.source_meta.get("title") or Path(item.source).stem or "untitled"
@@ -184,14 +183,14 @@ def process_item(item: QueueItem, settings: Settings, state: dict) -> dict | Non
         return None
 
 
-def main() -> int:
+def main(argv=None) -> int:
     from guides.state import get_state, set_state, list_pending
 
     parser = argparse.ArgumentParser(description="Pipeline A: Ingest")
     parser.add_argument("--url", help="URL to ingest")
     parser.add_argument("--file", help="Local file to ingest")
     parser.add_argument("--repo", help="GitHub repo to ingest")
-    args = parser.parse_args()
+    args = parser.parse_args(argv)
 
     settings = Settings()
 
@@ -215,17 +214,7 @@ def main() -> int:
 
     processed_count = 0
     for item in items:
-        # For hash-based dedup, we need a view of all current states.
-        # Since we migrated to SQLite, we could either fetch all or just rely on set_state.
-        # The existing process_item expects a 'state' dict for dedup check.
-        # Let's provide a minimal one or refactor process_item to use SQLite directly.
-        from guides.state import _get_conn
-        conn = _get_conn()
-        all_rows = conn.execute("SELECT slug, content_hash FROM articles").fetchall()
-        current_state = {r["slug"]: {"content_hash": r["content_hash"]} for r in all_rows}
-        conn.close()
-
-        res = process_item(item, settings, current_state)
+        res = process_item(item, settings)
         if res:
             slug = res["slug"]
             set_state(slug, "raw", True)

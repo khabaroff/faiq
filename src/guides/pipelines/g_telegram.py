@@ -24,7 +24,7 @@ from guides.state import get_state, set_state
 
 logger = logging.getLogger(__name__)
 
-ROOT = Path.cwd()
+ROOT = Path(__file__).resolve().parent.parent.parent.parent
 CONTENT_DIR = ROOT / "public"
 SUMMARIES_DIR = CONTENT_DIR / "summaries"
 
@@ -71,7 +71,7 @@ def call_llm_telegram(fm: dict) -> str:
     deployment = s.azure_deployment_fast or s.azure_deployment_smart
     system = "You are a social media manager for a technical AI channel. Write a concise and engaging Telegram post. Follow the format exactly."
     
-    response = call_llm(get_smart_client(), deployment, prompt, system)
+    response, _ = call_llm(get_smart_client(), deployment, prompt, system)
     return response.strip()
 
 def send_telegram_message(text: str) -> bool:
@@ -133,12 +133,12 @@ def publish_one(slug: str, dry_run: bool = False) -> bool:
         logger.error("Failed to publish to Telegram for %s: %s", slug, e)
         return False
 
-def main() -> int:
+def main(argv=None) -> int:
     parser = argparse.ArgumentParser(description="Pipeline G: Telegram Publisher")
     parser.add_argument("--slug", help="Process only this slug")
     parser.add_argument("--dry-run", action="store_true", help="Preview only, do not post")
     parser.add_argument("--force", action="store_true", help="Reprocess even if already published")
-    args = parser.parse_args()
+    args = parser.parse_args(argv)
 
     if args.slug:
         slugs = [args.slug]

@@ -24,7 +24,7 @@ from guides.state import get_state, set_state
 
 logger = logging.getLogger(__name__)
 
-ROOT = Path.cwd()
+ROOT = Path(__file__).resolve().parent.parent.parent.parent
 CONTENT_DIR = ROOT / "public"
 SUMMARIES_DIR = CONTENT_DIR / "summaries"
 SOURCES_DIR = CONTENT_DIR / "sources"
@@ -84,7 +84,7 @@ def call_llm_seo(fm: dict, body: str) -> dict:
     deployment = s.azure_deployment_fast or s.azure_deployment_smart
     system = "You are a technical SEO expert. Return only valid JSON as requested. No prose."
     
-    response = call_llm(get_smart_client(), deployment, prompt, system)
+    response, _ = call_llm(get_smart_client(), deployment, prompt, system)
     return _extract_json(response)
 
 
@@ -119,11 +119,11 @@ def optimize_one(slug: str) -> bool:
         return False
 
 
-def main() -> int:
+def main(argv=None) -> int:
     parser = argparse.ArgumentParser(description="Pipeline E: SEO Optimizer")
     parser.add_argument("--slug", help="Process only this slug")
     parser.add_argument("--force", action="store_true", help="Reprocess even if optimized")
-    args = parser.parse_args()
+    args = parser.parse_args(argv)
 
     if args.slug:
         slugs = [args.slug]

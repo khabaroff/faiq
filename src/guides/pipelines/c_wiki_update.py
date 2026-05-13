@@ -24,6 +24,7 @@ Usage:
 from __future__ import annotations
 
 import argparse
+import json
 import re
 import sys
 from datetime import date
@@ -99,7 +100,7 @@ def extract_summary_fm(summary_md: str) -> tuple[list[str], list[str], str]:
     return tools, patterns, source_url
 
 
-def call_llm_update(slug: str, current_page_md: str, tool_name: str, tool_type: str, new_mention: dict) -> dict:
+def call_llm_update(slug: str, current_page_md: str, tool_name: str, tool_type: str, new_mention: dict, kind: str = "") -> dict:
     prompt_template = load_prompt("wiki_tool_update.md")
 
     prompt = prompt_template.replace("{{current_page_md}}", current_page_md or "(пустая страница)")
@@ -124,7 +125,7 @@ def call_llm_update(slug: str, current_page_md: str, tool_name: str, tool_type: 
     if usage:
         append_log_entry(
             slug=slug,
-            action=f"wiki_{kind}",
+            action=f"wiki_{kind or tool_type}",
             model=deployment,
             tokens_in=usage.prompt_tokens,
             tokens_out=usage.completion_tokens,
@@ -176,7 +177,10 @@ def write_wiki_page(page_path: Path, name: str, slug: str, item_type: str, url: 
 def parse_front_matter(text: str) -> tuple[dict, str]:
     if not text.startswith("---\n"):
         return {}, text
-    end = text.index("\n---\n", 4)
+    try:
+        end = text.index("\n---\n", 4)
+    except ValueError:
+        return {}, text
     fm_raw = text[4:end]
     body = text[end + 5:]
     fm = {}
@@ -311,14 +315,14 @@ def propagate_summary(slug: str, force: bool = False) -> int:
     return processed
 
 
-def main() -> int:
+def main(argv=None) -> int:
     ap = argparse.ArgumentParser()
     from guides.state import get_state, set_state, list_pending
 
     ap.add_argument("--slug", help="single summary slug to propagate")
     ap.add_argument("--force", action="store_true", help="re-propagate even if already propagated")
     ap.add_argument("--batch", type=int, default=0, help="limit to N items (0 = all)")
-    args = ap.parse_args()
+    args = ap.parse_args(argv)
 
     if args.slug:
         slugs = [args.slug]

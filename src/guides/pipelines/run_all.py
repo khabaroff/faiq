@@ -1,4 +1,4 @@
-"""Run all pipelines in sequence: A → B → C → D."""
+"""Run all pipelines in sequence: A → B → C → D → E → G."""
 from __future__ import annotations
 
 import argparse

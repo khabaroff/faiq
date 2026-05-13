@@ -23,7 +23,7 @@ from guides.state import get_state, set_state
 
 logger = logging.getLogger(__name__)
 
-ROOT = Path.cwd()
+ROOT = Path(__file__).resolve().parent.parent.parent.parent
 QC_REPORT = ROOT / "state" / "quality-report.json"
 
 # Content paths
@@ -133,11 +133,11 @@ def clean_wiki_pages(slug_filter: str | None = None) -> list[dict]:
     return results
 
 
-def main() -> int:
+def main(argv=None) -> int:
     parser = argparse.ArgumentParser(description="Pipeline D: Quality Check")
     parser.add_argument("--mode", choices=["summary", "wiki", "both"], default="both")
     parser.add_argument("--slug", help="Process only this slug")
-    args = parser.parse_args()
+    args = parser.parse_args(argv)
 
     all_results = []
 
@@ -156,6 +156,8 @@ def main() -> int:
         if res.get("verdict") != "error":
             slug = res["slug"]
             set_state(slug, "quality_checked", True)
+            if res.get("verdict"):
+                set_state(slug, "quality", res["verdict"])
 
     QC_REPORT.parent.mkdir(parents=True, exist_ok=True)
     QC_REPORT.write_text(json.dumps({

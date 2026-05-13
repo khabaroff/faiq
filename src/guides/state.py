@@ -100,7 +100,17 @@ def get_state(slug: str) -> dict[str, Any]:
     }
 
 
+_VALID_FIELDS = frozenset({
+    "raw", "content_hash", "summarized_at", "wiki_propagated",
+    "wiki_propagated_at", "seo_optimized", "published_telegram",
+    "quality", "quality_checked",
+})
+
+
 def set_state(slug: str, field: str, value: Any) -> None:
+    if field not in _VALID_FIELDS:
+        raise ValueError(f"Unknown state field: {field!r}")
+
     conn = _get_conn()
 
     if field in ("raw", "wiki_propagated", "seo_optimized", "quality_checked"):
@@ -112,6 +122,13 @@ def set_state(slug: str, field: str, value: Any) -> None:
     )
     conn.commit()
     conn.close()
+
+
+def find_by_content_hash(content_hash: str) -> str | None:
+    conn = _get_conn()
+    row = conn.execute("SELECT slug FROM articles WHERE content_hash = ?", (content_hash,)).fetchone()
+    conn.close()
+    return row["slug"] if row else None
 
 
 def list_pending(stage: str) -> list[str]:
@@ -144,10 +161,4 @@ def save_state_json(state: dict) -> None:
 
 
 init_db()
-
-if not DB_PATH.exists() or DB_PATH.stat().st_size == 0:
-    init_db()
-
-migrated = migrate_from_json()
-if migrated > 0:
-    print(f"Migrated {migrated} entries from JSON to SQLite")
+migrate_from_json()
