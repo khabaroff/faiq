@@ -18,7 +18,7 @@ class Settings(BaseSettings):
     telegram_bot_token: str | None = None
     telegram_channel_id: str | None = None
     data_dir: Path = Path("data")
-    prompts_dir: Path = Path("guides/prompts")
+    prompts_dir: Path = Path(__file__).resolve().parent.parent.parent.parent / "prompts"
     ocr_model: str = "gpt-5.4"
 
     model_config = SettingsConfigDict(env_file=".env")
