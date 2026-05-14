@@ -99,3 +99,40 @@ Cost reports are generated as JSONL in `logs/cost_report.jsonl`.
 1. **Backup:** `cp state/articles.db state/articles.db.bak`
 2. **Restore:** `mv state/articles.db.bak state/articles.db`
 3. **Wiki Backup:** Wiki pages are backed up in `wiki/.backups/` (10 versions kept).
+
+## Incident Response & Troubleshooting
+
+### Scenario: "database is locked" (Persistent)
+1. **Detect:** Log entry "sqlite3.OperationalError: database is locked" in `logs/cron.log`.
+2. **Mitigation:**
+   - `fuser -v state/articles.db` to find PID.
+   - `kill -15 <PID>` (wait 5s) or `kill -9 <PID>`.
+   - If WAL files are stale: `rm state/articles.db-wal state/articles.db-shm`.
+
+### Scenario: Telegram 429 (Rate Limit)
+1. **Detect:** "TelegramError: 429 Too Many Requests".
+2. **Mitigation:**
+   - The pipeline handles this with exponential backoff.
+   - If persistent, check if `TELEGRAM_CHANNEL_ID` is being flooded (multiple processes?).
+   - Verify only one cron job is running: `crontab -l`.
+
+### Scenario: Azure 500 / 503 / 504 Storm
+1. **Detect:** Repeated "llm_retry" entries in `daily_log`.
+2. **Mitigation:**
+   - Check [Azure Service Health](https://status.azure.com/).
+   - Reduce `--workers` if hitting regional limits.
+   - Stop cron temporarily: `crontab -e` (comment out entry).
+
+### Scenario: Broken Backup
+1. **Detect:** `sqlite3 state/articles.db "PRAGMA integrity_check;"` returns errors.
+2. **Mitigation:**
+   - Restore from `state/articles.db.bak`.
+   - If backup is also corrupt, re-run Pipeline A on `data/inbox/done/` to rebuild from source bundles.
+
+### Scenario: Deploy Failure / Regression
+1. **Rollback Command:**
+   ```bash
+   # Switch back to previous release folder
+   PREV_REL=$(ls -1tr releases/ | tail -n 2 | head -n 1)
+   ln -sfn "releases/$PREV_REL" current
+   ```
