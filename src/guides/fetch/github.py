@@ -1,9 +1,27 @@
 import httpx
+import re
 
-from guides.fetch.base import FetchedContent, QueueItem, SourceType
+from guides.fetch.base import FetchedContent, QueueItem, SourceType, Fetcher, get_http_client
 from guides.fetch.jina import get_jina_reader_headers, get_jina_reader_url, throttle_jina_reader
 from guides.security.url_safety import validate_url
 from guides.settings import get_settings
+
+
+class GithubGistFetcher:
+    def can_fetch(self, item: QueueItem) -> bool:
+        return "gist.github.com" in item.source.lower()
+
+    def fetch(self, item: QueueItem) -> FetchedContent:
+        return fetch_github_gist(item)
+
+
+class GithubRepoFetcher:
+    def can_fetch(self, item: QueueItem) -> bool:
+        source = item.source.lower()
+        return "github.com" in source and re.search(r"github\.com/[^/]+/[^/]+/?$", source)
+
+    def fetch(self, item: QueueItem) -> FetchedContent:
+        return fetch_github_repo(item)
 
 
 def fetch_github_gist(item: QueueItem) -> FetchedContent:
@@ -13,8 +31,9 @@ def fetch_github_gist(item: QueueItem) -> FetchedContent:
     headers = _get_headers()
     description = gist_id
 
+    client = get_http_client()
     try:
-        resp = httpx.get(f"https://api.github.com/gists/{gist_id}", headers=headers, timeout=30)
+        resp = client.get(f"https://api.github.com/gists/{gist_id}", headers=headers)
         resp.raise_for_status()
         gist_data = resp.json()
         description = gist_data.get("description") or "Untitled Gist"
@@ -43,7 +62,8 @@ def _fetch_gist_via_jina(url: str) -> str:
     try:
         validate_url(url)
         throttle_jina_reader()
-        resp = httpx.get(get_jina_reader_url(url), headers=get_jina_reader_headers(), timeout=30, follow_redirects=True)
+        client = get_http_client()
+        resp = client.get(get_jina_reader_url(url), headers=get_jina_reader_headers(), follow_redirects=True)
         if resp.status_code == 200 and len(resp.text.strip()) > 100:
             return resp.text.strip()
     except Exception:
@@ -81,8 +101,9 @@ def fetch_github_repo(item: QueueItem) -> FetchedContent:
 
     repo_data = None
     used_api = False
+    client = get_http_client()
     try:
-        resp = httpx.get(api_url, headers=headers, timeout=30)
+        resp = client.get(api_url, headers=headers)
         resp.raise_for_status()
         repo_data = resp.json()
         used_api = True
@@ -132,7 +153,8 @@ def _get_headers() -> dict[str, str]:
 def _try_fetch_readme(url: str, headers: dict[str, str]) -> str:
     try:
         validate_url(url)
-        resp = httpx.get(url, headers=headers, timeout=30)
+        client = get_http_client()
+        resp = client.get(url, headers=headers)
         if resp.status_code == 200:
             return resp.text
     except Exception:

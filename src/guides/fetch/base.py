@@ -3,8 +3,21 @@ from dataclasses import dataclass, field
 from datetime import datetime
 from enum import StrEnum
 from pathlib import Path
+from typing import Any, Protocol, runtime_checkable
 
+import httpx
 from pydantic import BaseModel
+
+# Shared client with connection pooling
+_HTTP_CLIENT = httpx.Client(
+    timeout=30.0,
+    follow_redirects=False,  # Manual re-validation required for security
+    headers={"User-Agent": "guides-fetcher/1.0"}
+)
+
+
+def get_http_client() -> httpx.Client:
+    return _HTTP_CLIENT
 
 
 class SourceKind(StrEnum):
@@ -32,6 +45,19 @@ class FetchedContent:
     source_type: SourceType
     source_meta: dict = field(default_factory=dict)
     attachments: list[Path] = field(default_factory=list)
+
+
+@runtime_checkable
+class Fetcher(Protocol):
+    """Protocol for all content fetchers."""
+
+    def can_fetch(self, item: QueueItem) -> bool:
+        """Return True if this fetcher can handle the item."""
+        ...
+
+    def fetch(self, item: QueueItem) -> FetchedContent:
+        """Fetch content and return FetchedContent. Raises on failure."""
+        ...
 
 
 def detect_source_type(item: QueueItem) -> SourceType:

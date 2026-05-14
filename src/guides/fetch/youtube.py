@@ -9,7 +9,7 @@ from urllib.parse import parse_qs, urlparse
 
 import httpx
 
-from guides.fetch.base import FetchedContent, QueueItem, SourceType
+from guides.fetch.base import FetchedContent, QueueItem, SourceType, Fetcher
 from guides.security.url_safety import validate_url
 from guides.utils.fetch_cache import cache_failure, get_cached_failure
 
@@ -54,6 +54,16 @@ async def _terminate_process(proc: asyncio.subprocess.Process) -> None:
             await result
     except Exception:
         pass
+
+
+class YouTubeFetcher:
+    def can_fetch(self, item: QueueItem) -> bool:
+        url = item.source.lower()
+        return "youtube.com" in url or "youtu.be" in url
+
+    def fetch(self, item: QueueItem) -> FetchedContent:
+        """Synchronous wrapper for async fetch_youtube."""
+        return asyncio.run(fetch_youtube(item))
 
 
 async def fetch_youtube(item: QueueItem) -> FetchedContent:
