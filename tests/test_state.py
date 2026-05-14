@@ -8,8 +8,10 @@ from unittest.mock import patch
 from guides.state import (
     init_db, migrate_from_json, get_state, set_state,
     find_by_content_hash, list_pending, update_frontmatter,
-    set_status
+    set_status, _VALID_FIELDS, _build_alter_columns
 )
+from guides.models import ArticleState
+from guides.frontmatter import VALID_STATE_KEYS, filter_state_keys
 
 class StateTests(unittest.TestCase):
     def setUp(self):
@@ -27,10 +29,49 @@ class StateTests(unittest.TestCase):
         for p in self.patches:
             p.start()
 
+        # Reset connection cache so each test gets its own DB
+        import guides.state
+        if hasattr(guides.state._local, "conn"):
+            try:
+                guides.state._local.conn.close()
+            except Exception:
+                pass
+            delattr(guides.state._local, "conn")
+
     def tearDown(self):
         for p in self.patches:
             p.stop()
         self.tmpdir.cleanup()
+
+    def test_schema_invariant(self):
+        """Property: ArticleState fields == _VALID_FIELDS == DB columns == frontmatter state keys."""
+        model_fields = set(ArticleState.model_fields)
+        valid_fields = set(_VALID_FIELDS)
+        frontmatter_state_keys = VALID_STATE_KEYS
+
+        # 1. Pydantic model == _VALID_FIELDS
+        self.assertEqual(model_fields, valid_fields)
+        self.assertEqual(model_fields, frontmatter_state_keys)
+
+        # 2. SQLite schema includes all ArticleState fields (plus slug PK)
+        init_db()
+        conn = sqlite3.connect(str(self.db_path))
+        cursor = conn.execute("PRAGMA table_info(articles)")
+        db_columns = {row[1] for row in cursor.fetchall()}
+        conn.close()
+
+        self.assertIn("slug", db_columns)
+        for field in model_fields:
+            self.assertIn(field, db_columns, f"DB missing column for {field}")
+
+        # 3. ALTER TABLE columns derived from ArticleState
+        alter_cols = {name for name, _ in _build_alter_columns()}
+        self.assertEqual(alter_cols, model_fields)
+
+        # 4. filter_state_keys only keeps ArticleState fields
+        mixed = {"status": "ok", "tools": ["x"], "slug": "s", "raw": True}
+        filtered = filter_state_keys(mixed)
+        self.assertEqual(filtered, {"status": "ok", "raw": True})
 
     def test_init_db_and_idempotency(self):
         init_db()
@@ -89,6 +130,16 @@ class StateTests(unittest.TestCase):
 
     def test_list_pending(self):
         init_db()
+        # Ensure clean state by deleting all rows first
+        conn = sqlite3.connect(str(self.db_path))
+        conn.execute("DELETE FROM articles")
+        conn.commit()
+        conn.close()
+        # Clear cache so _ensure_db picks up the clean DB
+        import guides.state
+        if hasattr(guides.state._local, "conn"):
+            delattr(guides.state._local, "conn")
+
         set_state("s1", "raw", False)
         set_state("s2", "raw", True)
         set_state("s2", "summarized_at", None)
@@ -146,6 +197,15 @@ class StateTests(unittest.TestCase):
 
     def test_list_pending_more_stages(self):
         init_db()
+        # Clean state first
+        conn = sqlite3.connect(str(self.db_path))
+        conn.execute("DELETE FROM articles")
+        conn.commit()
+        conn.close()
+        import guides.state
+        if hasattr(guides.state._local, "conn"):
+            delattr(guides.state._local, "conn")
+
         set_state("s1", "wiki_propagated", True)
         set_state("s1", "seo_optimized", False)
         set_state("s2", "seo_optimized", True)

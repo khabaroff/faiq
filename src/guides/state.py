@@ -10,6 +10,7 @@ from typing import Any
 import yaml
 
 from guides.atomic_write import atomic_write_text
+from guides.models import ArticleState
 
 ROOT = Path(__file__).resolve().parent.parent.parent
 STATE_DIR = ROOT / "state"
@@ -30,8 +31,37 @@ def _get_conn() -> sqlite3.Connection:
     return _local.conn
 
 
+def _sql_type_for_field(field_info) -> str:
+    """Map ArticleState field to SQLite column definition."""
+    from typing import get_origin, get_args
+    annotation = field_info.annotation
+    default = field_info.default
+    origin = get_origin(annotation)
+    if origin is not None:
+        args = get_args(annotation)
+        annotation = next((a for a in args if a is not type(None)), str)
+    if annotation is bool:
+        return f"INTEGER DEFAULT {1 if default else 0}"
+    if annotation is int:
+        return f"INTEGER DEFAULT {default if isinstance(default, int) else 0}"
+    if annotation is str and isinstance(default, str):
+        return f"TEXT DEFAULT '{default}'"
+    return "TEXT"
+
+
+def _build_alter_columns() -> list[tuple[str, str]]:
+    """Generate ALTER TABLE columns from ArticleState."""
+    columns: list[tuple[str, str]] = []
+    for name, field_info in ArticleState.model_fields.items():
+        if name == "slug":
+            continue
+        columns.append((name, _sql_type_for_field(field_info)))
+    return columns
+
+
 def init_db() -> None:
      conn = _get_conn()
+     # Base CREATE TABLE — must match ArticleState fields
      conn.execute(
          """
          CREATE TABLE IF NOT EXISTS articles (
@@ -55,17 +85,8 @@ def init_db() -> None:
          """
      )
      conn.commit()
-     # add columns that may be missing in older DBs
-     for col, definition in [
-         ("content_hash", "TEXT"),
-         ("quality_checked", "INTEGER DEFAULT 0"),
-         ("qc_hash", "TEXT"),
-         ("status", "TEXT DEFAULT 'draft'"),
-         ("revision_count", "INTEGER DEFAULT 0"),
-         ("last_edited_at", "TEXT"),
-         ("last_edited_by", "TEXT"),
-         ("compacted", "INTEGER DEFAULT 0"),
-     ]:
+     # Add columns that may be missing in older DBs (migrations)
+     for col, definition in _build_alter_columns():
          try:
              conn.execute(f"ALTER TABLE articles ADD COLUMN {col} {definition}")
              conn.commit()
@@ -136,12 +157,7 @@ def get_state(slug: str) -> dict[str, Any]:
     }
 
 
-_VALID_FIELDS = frozenset({
-    "raw", "content_hash", "summarized_at", "wiki_propagated",
-    "wiki_propagated_at", "seo_optimized", "published_telegram",
-    "quality", "quality_checked", "qc_hash", "status", "revision_count",
-    "last_edited_at", "last_edited_by", "compacted",
-})
+_VALID_FIELDS: frozenset[str] = frozenset(ArticleState.model_fields)
 
 _FIELD_SQL: dict[str, str] = {
     f: f"INSERT INTO articles (slug, {f}) VALUES (?, ?) ON CONFLICT(slug) DO UPDATE SET {f} = ?"
@@ -210,7 +226,7 @@ def update_frontmatter(filepath: Path, updates: dict) -> None:
 
 
 def set_status(slug: str, filepath: Path | None, status: str,
-               edited_by: str = "", filepath_for_fm: Path | None = None) -> None:
+                edited_by: str = "", filepath_for_fm: Path | None = None) -> None:
      """Устанавливает status в SQLite и обновляет frontmatter .md файла."""
      _ensure_db()
      now = datetime.now().isoformat(timespec="seconds")

@@ -61,3 +61,28 @@ class SeoResponse(BaseModel):
     def _truncate_str(cls, v: object) -> str:
         s = str(v) if v is not None else ""
         return s[:300]
+
+
+class ArticleState(BaseModel):
+    """Single source of truth for pipeline state fields.
+    
+    Must stay in sync with:
+      - SQLite schema (articles table columns except slug PK)
+      - _VALID_FIELDS in state.py
+      - State keys written to markdown frontmatter
+    """
+    raw: bool = False
+    content_hash: str | None = None
+    summarized_at: str | None = None
+    wiki_propagated: bool = False
+    wiki_propagated_at: str | None = None
+    seo_optimized: bool = False
+    published_telegram: str | None = None
+    quality: str | None = None
+    quality_checked: bool = False
+    qc_hash: str | None = None
+    status: str = "draft"
+    revision_count: int = 0
+    last_edited_at: str | None = None
+    last_edited_by: str | None = None
+    compacted: bool = False
