@@ -79,7 +79,7 @@ If gitleaks finds a secret in CI, the build fails. Rotate the exposed secret imm
 ## Operational Procedures
 
 ### Parallel Workers Configuration
-As of Sprint 3, parallel processing is enabled for PDF OCR and certain fetchers.
+Parallel processing enabled for Pipeline B (--workers 4 default) and PDF OCR.
 - **Max workers:** Recommended `CPU_COUNT * 2` or restricted by LLM Tier limits (TPM).
 - **Safety:** `state.py` uses `busy_timeout=5.0` and `threading-local` connections, making it thread-safe for parallel writes.
 
@@ -98,7 +98,7 @@ Cost reports are generated as JSONL in `logs/cost_report.jsonl`.
 ### Backup & Restore
 1. **Backup:** `cp state/articles.db state/articles.db.bak`
 2. **Restore:** `mv state/articles.db.bak state/articles.db`
-3. **Wiki Backup:** Wiki pages are backed up in `wiki/.backups/` (10 versions kept).
+3. **Wiki Backup:** Tool/technique pages live in `public/tools/` and `public/techniques/` — git history is the backup.
 
 ## Incident Response & Troubleshooting
 

@@ -185,7 +185,7 @@ published_telegram: "2026-05-13T14:00:00"
 ## Публикация через Quartz
 
 `public/` = папка которую Quartz публикует как статический сайт.
-Конфиг Quartz смотри в `_human/quartz-setup.md` (TODO: создать).
+Конфиг Quartz смотри в `_human/quartz-setup.md`.
 
 ---
 
