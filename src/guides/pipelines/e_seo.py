@@ -22,7 +22,7 @@ from guides.llm import call_llm, get_smart_client, load_prompt
 from guides.models import SeoResponse
 from guides.settings import Settings
 from guides.state import get_state, set_state, update_frontmatter
-from guides.utils.json_extract import extract_first_json
+from guides.json_extract import extract_json
 
 logger = logging.getLogger(__name__)
 
@@ -36,7 +36,7 @@ def _s() -> Settings:
     return Settings()
 
 
-_extract_json = extract_first_json
+_extract_json = extract_json
 
 
 def _render_seo_prompt(fm: dict, body: str) -> str:

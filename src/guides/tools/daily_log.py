@@ -1,15 +1,34 @@
-"""Daily log for pipeline actions."""
+"""Daily log for pipeline actions — append-only JSONL."""
 
+import json
+import os
 from datetime import datetime
 from pathlib import Path
 
-from guides.atomic_write import atomic_write_text
+try:
+    import fcntl
+except ImportError:
+    fcntl = None
 
 
 def _get_log_path() -> Path:
     now = datetime.now()
-    filename = now.strftime("%Y-%m-%d") + ".md"
+    filename = now.strftime("%Y-%m-%d") + ".jsonl"
     return Path(__file__).resolve().parent.parent.parent.parent / "logs" / filename
+
+
+def _write_jsonl(path: Path, record: dict) -> None:
+    line = json.dumps(record, ensure_ascii=False, separators=(",", ":")) + "\n"
+    with open(path, "a", encoding="utf-8") as f:
+        if fcntl is not None:
+            fcntl.flock(f.fileno(), fcntl.LOCK_EX)
+        try:
+            f.write(line)
+            f.flush()
+            os.fsync(f.fileno())
+        finally:
+            if fcntl is not None:
+                fcntl.flock(f.fileno(), fcntl.LOCK_UN)
 
 
 def append_log_entry(
@@ -23,46 +42,15 @@ def append_log_entry(
     log_path = _get_log_path()
     log_path.parent.mkdir(parents=True, exist_ok=True)
 
-    now = datetime.now().strftime("%H:%M:%S")
-    total_tokens = tokens_in + tokens_out
-    cost_str = f"{cost_usd:.4f}"
-
-    table_row = f"| {slug} | {action} | {model} | {total_tokens} | ${cost_str} | {now} |"
-
-    if not log_path.exists():
-        header = """# Daily Pipeline Log
-
-| slug | action | model | tokens | cost | time |
-| ---- | ------ | ----- | ------ | ---- | ---- |
-"""
-        atomic_write_text(log_path, header)
-
-    existing = log_path.read_text(encoding="utf-8")
-
-    lines = existing.splitlines()
-
-    total_idx = None
-    for i, line in enumerate(lines):
-        if line.startswith("Total cost:"):
-            total_idx = i
-            break
-
-    current_total = 0.0
-    if total_idx is not None:
-        try:
-            current_total = float(lines[total_idx].split("$")[1].strip())
-        except (IndexError, ValueError):
-            pass
-
-    new_total = current_total + cost_usd
-    total_line = f"Total cost: ${new_total:.4f}"
-
-    if total_idx is not None:
-        lines[total_idx] = total_line
-        lines.insert(total_idx, table_row)
-    else:
-        lines.append("")
-        lines.append(total_line)
-        lines.append(table_row)
-
-    atomic_write_text(log_path, "\n".join(lines) + "\n")
+    record = {
+        "ts": datetime.now().isoformat(timespec="seconds"),
+        "msg": "llm_call",
+        "slug": slug,
+        "action": action,
+        "deployment": model,
+        "prompt_tokens": tokens_in,
+        "completion_tokens": tokens_out,
+        "total_tokens": tokens_in + tokens_out,
+        "cost_usd": cost_usd,
+    }
+    _write_jsonl(log_path, record)

@@ -19,11 +19,11 @@ from datetime import date
 from pathlib import Path
 
 from guides.atomic_write import atomic_write_text
-from guides.llm import call_llm, get_smart_client, load_prompt
+from guides.llm import call_llm, count_tokens, get_smart_client, load_prompt, truncate_to_tokens
 from guides.models import SummaryCheckResponse, WikiCleanResponse
 from guides.settings import Settings
 from guides.state import get_state, set_state, update_frontmatter
-from guides.utils.json_extract import extract_first_json
+from guides.json_extract import extract_json
 
 logger = logging.getLogger(__name__)
 
@@ -37,18 +37,75 @@ SUMMARIES_DIR = settings.summaries_dir
 TOOLS_DIR = settings.tools_dir
 TECH_DIR = settings.techniques_dir
 
+MAX_QC_TOKENS = 8000
+CHUNK_OVERLAP = 500
 
-_extract_json = extract_first_json
+_extract_json = extract_json
 
 
 def _qc_hash(text: str) -> str:
     return hashlib.sha256(text.encode()).hexdigest()[:16]
 
 
+def _chunk_text_by_tokens(text: str, max_tokens: int, overlap: int = 500) -> list[str]:
+    try:
+        import tiktoken
+        enc = tiktoken.get_encoding("cl100k_base")
+    except Exception:
+        # fallback to rough char slicing if tiktoken fails
+        chars_per_token = 2 # RU conservative
+        chunk_chars = max_tokens * chars_per_token
+        overlap_chars = overlap * chars_per_token
+        chunks = []
+        start = 0
+        while start < len(text):
+            end = start + chunk_chars
+            chunks.append(text[start:end])
+            if end >= len(text):
+                break
+            start = end - overlap_chars
+        return chunks
+
+    tokens = enc.encode(text)
+    chunks = []
+    start = 0
+    while start < len(tokens):
+        end = start + max_tokens
+        chunk_tokens = tokens[start:end]
+        chunks.append(enc.decode(chunk_tokens))
+        if end >= len(tokens):
+            break
+        start = end - overlap
+    return chunks
+
+
 def call_llm_summary_check(source_text: str, summary_text: str, slug: str) -> dict:
     prompt_template = load_prompt("quality_check.md")
+    
+    source_tokens = count_tokens(source_text)
+    
+    if source_tokens <= MAX_QC_TOKENS:
+        return _call_qc_single(prompt_template, source_text, summary_text, slug)
+    
+    # Sliding window
+    logger.info("Source too long (%d tokens), using sliding window for %s", source_tokens, slug)
+    chunks = _chunk_text_by_tokens(source_text, MAX_QC_TOKENS, CHUNK_OVERLAP)
+    results = []
+    
+    for i, chunk in enumerate(chunks):
+        part_info = f"ВНИМАНИЕ: Это часть {i+1} из {len(chunks)} исходного текста. Проверь саммари на соответствие ЭТОЙ части. Саммари может содержать факты из других частей — не считай их галлюцинациями, если они не противоречат текущей части."
+        res = _call_qc_single(prompt_template, chunk, summary_text, slug, prefix=part_info)
+        results.append(res)
+    
+    return _aggregate_qc_results(results)
 
-    prompt = prompt_template + f"\n\n## Вход\n\n### Source ({slug})\n{source_text[:5000]}\n\n### Summary\n{summary_text}"
+
+def _call_qc_single(prompt_template: str, source_text: str, summary_text: str, slug: str, prefix: str = "") -> dict:
+    input_block = f"\n\n## Вход\n\n### Source ({slug})\n<UNTRUSTED_CONTENT>\n{source_text}\n</UNTRUSTED_CONTENT>\n\n### Summary\n<INPUT_DATA>\n{summary_text}\n</INPUT_DATA>"
+    if prefix:
+        prompt = prefix + "\n\n" + prompt_template + input_block
+    else:
+        prompt = prompt_template + input_block
 
     s = Settings()
     deployment = s.azure_deployment_fast or s.azure_deployment_smart
@@ -58,6 +115,30 @@ def call_llm_summary_check(source_text: str, summary_text: str, slug: str) -> di
     response, _ = call_llm(get_smart_client(), deployment, prompt, system)
     raw = _extract_json(response)
     return SummaryCheckResponse.model_validate(raw).model_dump()
+
+
+def _aggregate_qc_results(results: list[dict]) -> dict:
+    verdict_priority = {"needs_resummarize": 3, "minor_fix": 2, "ok": 1, "error": 0}
+    
+    final_verdict = "ok"
+    final_issues = []
+    seen_issues = set()
+    
+    for res in results:
+        v = res.get("verdict", "ok")
+        if verdict_priority.get(v, 0) > verdict_priority.get(final_verdict, 0):
+            final_verdict = v
+        
+        for issue in res.get("issues", []):
+            if issue not in seen_issues:
+                final_issues.append(issue)
+                seen_issues.add(issue)
+                
+    return {
+        "mode": "summary_check",
+        "verdict": final_verdict,
+        "issues": final_issues
+    }
 
 
 def call_llm_wiki_clean(page_text: str, slug: str) -> dict:

@@ -10,13 +10,12 @@ import re
 import sqlite3
 import sys
 import time
-import urllib.error
 import urllib.parse
-import urllib.request
 from collections.abc import Callable
 from pathlib import Path
 from typing import Literal
 
+import httpx
 from pydantic import BaseModel
 
 from guides.llm import call_smart_with_images
@@ -112,27 +111,42 @@ def discover_markdown_files(paths: list[Path]) -> list[Path]:
 
 
 def _download_url(url: str) -> tuple[bytes, str]:
-    validate_url(url)
-    req = urllib.request.Request(url, headers={"User-Agent": "guides-ocr-images/1.0"})
-    last_exc: Exception | None = None
-    for attempt in range(1, MAX_RETRIES + 1):
-        try:
-            with urllib.request.urlopen(req, timeout=DEFAULT_TIMEOUT_SECONDS) as resp:
-                final_url = resp.geturl()
-                if final_url != url:
-                    validate_url(final_url)
-                data = resp.read()
-                content_type = resp.headers.get_content_type() or "application/octet-stream"
+    current_url = url
+    max_redirects = 5
+    redirects_followed = 0
+
+    with httpx.Client(
+        headers={"User-Agent": "guides-ocr-images/1.0"},
+        timeout=DEFAULT_TIMEOUT_SECONDS,
+        follow_redirects=False
+    ) as client:
+        while True:
+            validate_url(current_url)
+            try:
+                resp = client.get(current_url)
+                if resp.is_redirect:
+                    redirects_followed += 1
+                    if redirects_followed > max_redirects:
+                        raise ValueError(f"Too many redirects for {url}")
+                    location = resp.headers.get("location")
+                    if not location:
+                        raise ValueError(f"Redirect without location for {current_url}")
+                    # Join relative location with current_url
+                    current_url = str(httpx.URL(current_url).join(location))
+                    continue
+                
+                resp.raise_for_status()
+                data = resp.content
+                content_type = resp.headers.get("content-type") or "application/octet-stream"
                 if not data:
-                    raise ValueError(f"empty response for {url}")
+                    raise ValueError(f"Empty response for {current_url}")
                 return data, content_type
-        except (urllib.error.URLError, urllib.error.HTTPError, TimeoutError, ValueError) as exc:
-            last_exc = exc
-            if attempt == MAX_RETRIES:
-                break
-            time.sleep(0.4 * attempt)
-    assert last_exc is not None
-    raise last_exc
+                
+            except (httpx.HTTPError, ValueError) as exc:
+                if redirects_followed < max_redirects and isinstance(exc, httpx.HTTPError):
+                     # Simple retry logic if needed, but manual re-validation is key
+                     pass
+                raise
 
 
 def _sha256_bytes(data: bytes) -> str:
@@ -245,15 +259,10 @@ def _append_run_log(record: dict) -> None:
         fh.write(json.dumps(record, ensure_ascii=False, sort_keys=True) + "\n")
 
 
+from guides.json_extract import extract_json
+
 def _extract_json_from_text(text: str) -> dict:
-    stripped = text.strip()
-    try:
-        return json.loads(stripped)
-    except json.JSONDecodeError:
-        match = re.search(r"\{.*\}", stripped, re.DOTALL)
-        if match is None:
-            raise
-        return json.loads(match.group(0))
+    return extract_json(text)
 
 
 def run_vision_ocr(

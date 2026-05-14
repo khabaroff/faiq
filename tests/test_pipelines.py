@@ -258,18 +258,15 @@ class PipelineDTests(unittest.TestCase):
     @patch("guides.pipelines.d_quality_check.clean_wiki_pages", return_value=[])
     @patch("guides.pipelines.d_quality_check.set_state")
     @patch("guides.pipelines.d_quality_check.update_frontmatter")
-    @patch("guides.pipelines.d_quality_check.QC_REPORT")
     @patch("guides.pipelines.d_quality_check.SUMMARIES_DIR")
-    def test_main(self, mock_sum_dir, mock_report, mock_fm, mock_state, mock_clean, mock_check):
+    def test_main(self, mock_sum_dir, mock_fm, mock_state, mock_clean, mock_check):
         from tempfile import TemporaryDirectory
         with TemporaryDirectory() as tmpdir:
             tp = Path(tmpdir)
             report_file = tp / "report.json"
-            mock_report.__str__.return_value = str(report_file)
-            mock_report.parent = report_file.parent
-            
             mock_sum_dir.__truediv__.side_effect = lambda x: tp / x
-            with patch.object(Path, "exists", return_value=True):
+            with patch.object(Path, "exists", return_value=True), \
+                 patch("guides.pipelines.d_quality_check.QC_REPORT", report_file):
                 self.assertEqual(d.main(["--mode", "summary"]), 0)
                 self.assertTrue(report_file.exists())
 

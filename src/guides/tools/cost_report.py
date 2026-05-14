@@ -5,6 +5,7 @@ import argparse
 import json
 import os
 from collections import defaultdict
+from collections.abc import Iterable
 from dataclasses import dataclass
 from datetime import datetime, timedelta
 from pathlib import Path
@@ -28,7 +29,9 @@ def _log_dir() -> Path:
 
 
 def _iter_log_files(log_dir: Path) -> list[Path]:
-    files = sorted(p for p in log_dir.glob("pipeline.log*") if p.is_file())
+    files = sorted(p for p in log_dir.glob("*.jsonl") if p.is_file())
+    # Backward compat: also read legacy pipeline.log* files
+    files += sorted(p for p in log_dir.glob("pipeline.log*") if p.is_file())
     return files
 
 
@@ -53,27 +56,32 @@ def _format_usd(amount: float) -> str:
     return f"${amount:.4f}"
 
 
-def _collect_entries(log_files: list[Path], days: int | None) -> list[dict]:
-    entries: list[dict] = []
+def _iter_entries(log_files: list[Path], days: int | None) -> Iterable[dict]:
+    """Stream JSONL entries without loading full files into memory."""
     for path in log_files:
-        for line in path.read_text(encoding="utf-8").splitlines():
-            line = line.strip()
-            if not line:
-                continue
-            try:
-                payload = json.loads(line)
-            except json.JSONDecodeError:
-                continue
-            if payload.get("msg") != "llm_call":
-                continue
-            ts = _parse_ts(str(payload.get("ts", "")))
-            if ts is None or not _within_days(ts, days):
-                continue
-            entries.append(payload)
-    return entries
+        with open(path, "r", encoding="utf-8") as f:
+            for line in f:
+                line = line.strip()
+                if not line:
+                    continue
+                try:
+                    payload = json.loads(line)
+                except json.JSONDecodeError:
+                    continue
+                if payload.get("msg") != "llm_call":
+                    continue
+                ts = _parse_ts(str(payload.get("ts", "")))
+                if ts is None or not _within_days(ts, days):
+                    continue
+                yield payload
 
 
-def _aggregate(entries: list[dict]) -> tuple[dict[str, Totals], dict[str, Totals], Totals]:
+def _collect_entries(log_files: list[Path], days: int | None) -> list[dict]:
+    """Materialize streamed entries into a list (for tests / small datasets)."""
+    return list(_iter_entries(log_files, days))
+
+
+def _aggregate(entries: Iterable[dict]) -> tuple[dict[str, Totals], dict[str, Totals], Totals]:
     by_model: dict[str, Totals] = defaultdict(Totals)
     by_date: dict[str, Totals] = defaultdict(Totals)
     grand = Totals()
@@ -132,8 +140,8 @@ def main() -> int:
         print(f"No logs found in {log_dir}")
         return 0
 
-    entries = _collect_entries(_iter_log_files(log_dir), args.days)
-    by_model, by_date, grand = _aggregate(entries)
+    # Stream entries directly into aggregation (no full-memory load)
+    by_model, by_date, grand = _aggregate(_iter_entries(_iter_log_files(log_dir), args.days))
 
     label = "all time" if args.days is None else f"last {args.days} days"
     print(f"=== Cost Report ({label}) ===")

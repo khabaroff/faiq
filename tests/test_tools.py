@@ -19,23 +19,45 @@ class ToolTests(unittest.TestCase):
             log_dir.mkdir()
             
             with patch("guides.tools.daily_log._get_log_path") as mock_path:
-                log_file = log_dir / "2026-05-13.md"
+                log_file = log_dir / "2026-05-13.jsonl"
                 mock_path.return_value = log_file
                 
                 daily_log.append_log_entry("s1", "action1", "gpt-4", 100, 50, 0.01)
-                content = log_file.read_text()
-                self.assertIn("| s1 | action1 | gpt-4 | 150 | $0.0100 |", content)
-                self.assertIn("Total cost: $0.0100", content)
+                lines = log_file.read_text().strip().splitlines()
+                self.assertEqual(len(lines), 1)
+                entry = json.loads(lines[0])
+                self.assertEqual(entry["slug"], "s1")
+                self.assertEqual(entry["action"], "action1")
+                self.assertEqual(entry["deployment"], "gpt-4")
+                self.assertEqual(entry["total_tokens"], 150)
+                self.assertEqual(entry["cost_usd"], 0.01)
+                self.assertEqual(entry["msg"], "llm_call")
                 
                 daily_log.append_log_entry("s2", "action2", "gpt-4", 200, 100, 0.02)
-                content2 = log_file.read_text()
-                self.assertIn("| s2 | action2 | gpt-4 | 300 | $0.0200 |", content2)
-                self.assertIn("Total cost: $0.0300", content2)
+                lines = log_file.read_text().strip().splitlines()
+                self.assertEqual(len(lines), 2)
+                entry2 = json.loads(lines[1])
+                self.assertEqual(entry2["slug"], "s2")
+                self.assertEqual(entry2["total_tokens"], 300)
+                self.assertEqual(entry2["cost_usd"], 0.02)
+
+    def test_daily_log_performance(self):
+        """Bench: 1000 entries append-only JSONL < 200ms."""
+        import time
+        with TemporaryDirectory() as tmpdir:
+            tp = Path(tmpdir)
+            log_file = tp / "bench.jsonl"
+            with patch("guides.tools.daily_log._get_log_path", return_value=log_file):
+                start = time.perf_counter()
+                for i in range(1000):
+                    daily_log.append_log_entry(f"s{i}", "action", "gpt-4", 100, 50, 0.01)
+                elapsed = time.perf_counter() - start
+                self.assertLess(elapsed, 0.2, f"1000 appends took {elapsed:.3f}s, expected < 0.2s")
 
     def test_cost_report_collect_and_aggregate(self):
         with TemporaryDirectory() as tmpdir:
             tp = Path(tmpdir)
-            log_file = tp / "pipeline.log"
+            log_file = tp / "2026-05-13.jsonl"
             log_file.write_text(json.dumps({
                 "ts": "2026-05-13T12:00:00Z",
                 "msg": "llm_call",
@@ -44,7 +66,7 @@ class ToolTests(unittest.TestCase):
                 "cost_usd": 0.01
             }) + "\n")
             
-            entries = cost_report._collect_entries([log_file], days=None)
+            entries = list(cost_report._iter_entries([log_file], days=None))
             self.assertEqual(len(entries), 1)
             
             by_model, by_date, grand = cost_report._aggregate(entries)
@@ -62,7 +84,7 @@ class ToolTests(unittest.TestCase):
             mock_log_dir.return_value = tp
             mock_args.return_value = argparse.Namespace(days=None)
             
-            log_file = tp / "pipeline.log"
+            log_file = tp / "2026-05-13.jsonl"
             log_file.write_text(json.dumps({
                 "ts": "2026-05-13T12:00:00Z",
                 "msg": "llm_call",

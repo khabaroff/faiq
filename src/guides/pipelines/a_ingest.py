@@ -14,6 +14,7 @@ Workflow:
 from __future__ import annotations
 
 import argparse
+import asyncio
 import hashlib
 import logging
 import re
@@ -28,6 +29,7 @@ from guides.fetch.image_ocr import process_markdown_file
 from guides.fetch.image_vision import analyze_image, is_image
 from guides.fetch.pdf import fetch_pdf
 from guides.fetch.url import fetch_url
+from guides.fetch.youtube import fetch_youtube
 from guides.security.fs_safety import assert_safe_slug, safe_join
 from guides.settings import Settings
 from guides.state import find_by_content_hash, set_state
@@ -150,6 +152,9 @@ def process_item(item: QueueItem, settings: Settings) -> dict | None:
         if is_pdf:
             fetched = fetch_pdf(item)
             actual_type = "pdf"
+        elif source_type == SourceType.YOUTUBE:
+            fetched = asyncio.run(fetch_youtube(item))
+            actual_type = "youtube"
         elif source_type == SourceType.GITHUB_REPO:
             fetched = fetch_github_repo(item)
             actual_type = "repo"
