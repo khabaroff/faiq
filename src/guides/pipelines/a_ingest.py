@@ -32,8 +32,8 @@ from guides.fetch.url import fetch_url
 from guides.fetch.youtube import fetch_youtube
 from guides.security.fs_safety import assert_safe_slug, safe_join
 from guides.settings import get_settings
+from guides.slugify import short_hash_slug, slugify
 from guides.state import find_by_content_hash, set_state
-from guides.utils.slugify import slugify
 
 logger = logging.getLogger(__name__)
 
@@ -102,7 +102,7 @@ def _process_image(item: QueueItem, settings: Settings) -> dict | None:
         return None
 
     title = result.get("title") or image_path.stem
-    slug = slugify(title) or hashlib.md5(item.source.encode()).hexdigest()[:8]
+    slug = slugify(title) or short_hash_slug(item.source)
 
     images_dir = settings.inbox_dir.parent / "public" / "images"
     images_dir.mkdir(parents=True, exist_ok=True)
@@ -182,11 +182,11 @@ def process_item(item: QueueItem, settings: Settings) -> dict | None:
         title = fetched.source_meta.get("title") or Path(item.source).stem or "untitled"
         slug = slugify(title)
         if not slug:
-            slug = hashlib.md5(item.source.encode()).hexdigest()[:8]
+            slug = short_hash_slug(item.source)
         try:
             assert_safe_slug(slug)
         except ValueError:
-            slug = hashlib.md5(item.source.encode()).hexdigest()[:16]
+            slug = short_hash_slug(item.source, length=16)
 
         # 3. Save temp for OCR
         content_sources_dir = settings.sources_dir

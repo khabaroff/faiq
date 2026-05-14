@@ -38,13 +38,13 @@ from guides.atomic_write import atomic_write_text
 from guides.frontmatter import parse_frontmatter
 from guides.llm import call_llm, get_smart_client, load_prompt
 from guides.models import WikiUpdateResponse
+from guides.protocols import Logger, get_default_logger
 from guides.security.fs_safety import assert_safe_slug, safe_join
 from guides.settings import get_settings, Settings
-from guides.tools.daily_log import append_log_entry
+from guides.slugify import canonicalize_slug, slugify
 from guides.json_extract import extract_json
-from guides.utils.slugify import slugify
 
-logger = logging.getLogger(__name__)
+log = logging.getLogger(__name__)
 
 def _backup_page(page_path: Path) -> None:
     """Save copy of existing page before overwrite."""
@@ -59,38 +59,6 @@ def _backup_page(page_path: Path) -> None:
 @_cache
 def _s() -> Settings:
     return get_settings()
-
-
-def canonicalize_slug(name: str, existing_slugs: list[str], item_type: str = "") -> str:
-    """Map a name to existing slug using fuzzy match; LLM fallback only on near-collision."""
-    from rapidfuzz import fuzz
-    from rapidfuzz import process as fuzz_process
-
-    candidate = slugify(name)
-    if not candidate:
-        return slugify(name) or name[:40].lower().replace(" ", "-")
-
-    # Exact match wins immediately
-    if candidate in existing_slugs:
-        return candidate
-
-    # No existing slugs — just use candidate
-    if not existing_slugs:
-        return candidate
-
-    # Find best fuzzy match across ALL existing slugs (not capped at 10)
-    result = fuzz_process.extractOne(
-        candidate,
-        existing_slugs,
-        scorer=fuzz.token_sort_ratio,
-        score_cutoff=85,
-    )
-    if result is not None:
-        matched_slug, _score, _ = result
-        return matched_slug
-
-    # No close match → new slug
-    return candidate
 
 
 def extract_summary_fm(summary_md: str) -> tuple[list[str], list[str], str]:
@@ -115,7 +83,16 @@ def extract_summary_fm(summary_md: str) -> tuple[list[str], list[str], str]:
     return tools, patterns, source_url
 
 
-def call_llm_update(slug: str, current_page_md: str, tool_name: str, tool_type: str, new_mention: dict, kind: str = "") -> dict:
+def call_llm_update(
+    slug: str,
+    current_page_md: str,
+    tool_name: str,
+    tool_type: str,
+    new_mention: dict,
+    kind: str = "",
+    logger: Logger | None = None,
+) -> dict:
+    cost_logger = logger or get_default_logger()
     prompt_template = load_prompt("wiki_tool_update.md")
 
     prompt = prompt_template.replace("{{current_page_md}}", current_page_md or "(пустая страница)")
@@ -134,7 +111,7 @@ def call_llm_update(slug: str, current_page_md: str, tool_name: str, tool_type: 
     parsed = WikiUpdateResponse.model_validate(extract_json(response))
 
     if usage:
-        append_log_entry(
+        cost_logger.log_cost(
             slug=slug,
             action=f"wiki_{kind or tool_type}",
             model=deployment,
@@ -224,7 +201,7 @@ def append_mention_to_page(page_path: Path, new_mention: dict) -> None:
     atomic_write_text(page_path, front_matter + body)
 
 
-def propagate_summary(slug: str, force: bool = False) -> int:
+def propagate_summary(slug: str, force: bool = False, logger: Logger | None = None) -> int:
     settings = get_settings()
     summary_path = settings.summaries_dir / f"{slug}.md"
     if not summary_path.exists():
@@ -251,7 +228,7 @@ def propagate_summary(slug: str, force: bool = False) -> int:
             try:
                 assert_safe_slug(page_slug)
             except ValueError:
-                logger.warning("unsafe slug skipped: %r", page_slug)
+                log.warning("unsafe slug skipped: %r", page_slug)
                 continue
             page_path = safe_join(target_dir, f"{page_slug}.md")
 
@@ -273,9 +250,10 @@ def propagate_summary(slug: str, force: bool = False) -> int:
                     tool_name=name,
                     tool_type=kind,
                     new_mention=new_mention,
+                    logger=logger,
                 )
             except Exception:
-                logger.exception("LLM error for %s/%s", slug, name)
+                log.exception("LLM error for %s/%s", slug, name)
                 continue
 
             action = result.get("action", "create")
@@ -352,7 +330,7 @@ def main(argv=None) -> int:
             set_state(slug, "status", "propagated")
             total_processed += processed
         except Exception:
-            logger.exception("Failed to propagate %s", slug)
+            log.exception("Failed to propagate %s", slug)
 
     print(f"Total wiki pages updated: {total_processed}")
     return 0

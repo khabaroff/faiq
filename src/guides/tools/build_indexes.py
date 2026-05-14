@@ -15,15 +15,11 @@ from pathlib import Path
 import yaml
 
 from guides.atomic_write import atomic_write_text
+from guides.slugify import slugify
 
 logger = logging.getLogger(__name__)
 
 from guides.settings import get_settings
-
-
-def slugify(name: str) -> str:
-    s = re.sub(r"[^\w\s-]", "", name.lower())
-    return re.sub(r"[-\s]+", "-", s).strip("-")[:80]
 
 
 def parse_front_matter_yaml(text: str) -> dict:

@@ -32,10 +32,10 @@ import yaml
 from guides.atomic_write import atomic_write_text
 from guides.frontmatter import parse_frontmatter
 from guides.llm import call_llm_messages, count_tokens, get_smart_client, load_prompt
+from guides.protocols import Logger, get_default_logger
 from guides.settings import get_settings, Settings
-from guides.tools.daily_log import append_log_entry
 
-logger = logging.getLogger(__name__)
+log = logging.getLogger(__name__)
 
 
 @_cache
@@ -94,8 +94,16 @@ def _render_summary_prompt(source_text: str, source_url: str, source_type: str, 
     return prompt
 
 
-def call_llm_summary(slug: str, source_text: str, source_url: str, source_type: str, lang_orig: str) -> str:
+def call_llm_summary(
+    slug: str,
+    source_text: str,
+    source_url: str,
+    source_type: str,
+    lang_orig: str,
+    logger: Logger | None = None,
+) -> str:
     """Returns full markdown string (validated). Raises on repeated failure."""
+    cost_logger = logger or get_default_logger()
     base_prompt = _render_summary_prompt(source_text, source_url, source_type, lang_orig)
 
     token_count = count_tokens(source_text)
@@ -122,7 +130,7 @@ def call_llm_summary(slug: str, source_text: str, source_url: str, source_type: 
         total_cost += last_usage.cost_usd
 
         if _validate_summary_md(last_response):
-            append_log_entry(
+            cost_logger.log_cost(
                 slug=slug,
                 action="summary",
                 model=deployment,
@@ -132,8 +140,8 @@ def call_llm_summary(slug: str, source_text: str, source_url: str, source_type: 
             )
             return last_response
 
-        logger.warning("attempt %d/%d: bad frontmatter format for %s", attempt + 1, MAX_RETRIES, slug)
-        append_log_entry(
+        log.warning("attempt %d/%d: bad frontmatter format for %s", attempt + 1, MAX_RETRIES, slug)
+        cost_logger.log_cost(
             slug=slug,
             action=f"summary_retry_{attempt + 1}",
             model=deployment,
@@ -146,8 +154,8 @@ def call_llm_summary(slug: str, source_text: str, source_url: str, source_type: 
         messages.append({"role": "assistant", "content": last_response})
         messages.append({"role": "user", "content": f"**ВАЖНО (попытка {attempt + 2}):** {_CORRECTION}"})
 
-    logger.error("all %d attempts failed for %s, marking needs_review", MAX_RETRIES, slug)
-    append_log_entry(
+    log.error("all %d attempts failed for %s, marking needs_review", MAX_RETRIES, slug)
+    cost_logger.log_cost(
         slug=slug,
         action="summary_needs_review",
         model=deployment,
@@ -158,7 +166,7 @@ def call_llm_summary(slug: str, source_text: str, source_url: str, source_type: 
     return f"---\ntools: []\npatterns: []\nquality: needs_review\n---\n\n{last_response}"
 
 
-def summarize_one(slug: str) -> Path:
+def summarize_one(slug: str, logger: Logger | None = None) -> Path:
     settings = get_settings()
     src = settings.sources_dir / f"{slug}.md"
     if not src.exists():
@@ -173,6 +181,7 @@ def summarize_one(slug: str) -> Path:
         source_url=src_fm.get("source_url", ""),
         source_type=src_fm.get("source_type", "article"),
         lang_orig=src_fm.get("lang", "ru"),
+        logger=logger,
     )
 
     llm_fm, llm_body = parse_frontmatter(summary_md)
@@ -202,12 +211,12 @@ def summarize_one(slug: str) -> Path:
     return out
 
 
-def _summarize_slug(slug: str, force: bool) -> str | None:
+def _summarize_slug(slug: str, force: bool, logger: Logger | None = None) -> str | None:
     from guides.state import set_state
     settings = get_settings()
     if not force and (settings.summaries_dir / f"{slug}.md").exists():
         return None
-    out = summarize_one(slug)
+    out = summarize_one(slug, logger=logger)
     set_state(slug, "summarized_at", date.today().isoformat())
     set_state(slug, "status", "reviewed")
     return str(out)

@@ -20,7 +20,7 @@ class Settings(BaseSettings):
     jina_api_key: str | None = None
     telegram_bot_token: str | None = None
     telegram_channel_id: str | None = None
-    inbox_dir: Path = _ROOT / "inbox"
+    inbox_dir: Path = _ROOT / "data" / "inbox"
     logs_dir: Path = _ROOT / "logs"
     prompts_dir: Path = _ROOT / "prompts"
     ocr_model: str = "gpt-5.4"

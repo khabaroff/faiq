@@ -15,16 +15,9 @@ import sys
 from pathlib import Path
 
 from guides.settings import get_settings
+from guides.slugify import slugify
 
 WIKILINK_RE = re.compile(r"\[\[([^\]]+)\]\]")
-
-
-def slugify(name: str) -> str:
-    """Convert a wikilink target to a file slug."""
-    s = name.strip().lower()
-    s = re.sub(r"[_\s]+", "-", s)
-    s = re.sub(r"-{2,}", "-", s)
-    return s.strip("-")
 
 
 def _target_dirs():
