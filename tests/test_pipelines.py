@@ -1,14 +1,46 @@
 import unittest
+import yaml
 from pathlib import Path
 from unittest.mock import patch, Mock, MagicMock
 import json
 
+import guides.pipelines.a_ingest as a
 import guides.pipelines.b_summarize as b
 import guides.pipelines.c_wiki_update as c
 import guides.pipelines.e_seo as e
 import guides.pipelines.g_telegram as g
 import guides.pipelines.d_quality_check as d
 from guides.slugify import canonicalize_slug
+from guides.models import WikiUpdateResponse
+from guides.fetch.base import FetchedContent, QueueItem, SourceKind, SourceType
+
+class PipelineATests(unittest.TestCase):
+    @patch("guides.pipelines.a_ingest.process_markdown_file")
+    @patch("guides.pipelines.a_ingest.fetch_url")
+    def test_ingest_escapes_yaml_in_title(self, mock_fetch_url, mock_ocr):
+        from tempfile import TemporaryDirectory
+
+        with TemporaryDirectory() as tmpdir:
+            tp = Path(tmpdir)
+            settings = MagicMock(sources_dir=tp, inbox_dir=tp)
+            item = QueueItem(
+                source="https://example.com/post",
+                source_kind=SourceKind.URL,
+                received_at=__import__("datetime").datetime.now(),
+            )
+            mock_fetch_url.return_value = FetchedContent(
+                raw_text="# Body\n",
+                source_type=SourceType.ARTICLE,
+                source_meta={"title": 'Bad: title\nstatus: hacked', "url": item.source, "lang": "en"},
+            )
+
+            result = a.process_item(item, settings)
+            self.assertIsNotNone(result)
+            out = tp / f"{result['slug']}.md"
+            fm, _body = __import__("guides.frontmatter").frontmatter.parse_frontmatter(out.read_text(encoding="utf-8"))
+            self.assertEqual(fm["title"], 'Bad: title\nstatus: hacked')
+            self.assertEqual(fm["status"], "draft")
+
 
 class PipelineBTests(unittest.TestCase):
     def test_count_tokens(self):
@@ -19,6 +51,15 @@ class PipelineBTests(unittest.TestCase):
         ru = "а" * 40
         en = "a" * 40
         self.assertGreater(b.count_tokens(ru), b.count_tokens(en))
+
+    def test_count_tokens_cyrillic_within_20pct(self):
+        import tiktoken
+
+        text = "Привет мир " * 400
+        enc = tiktoken.get_encoding("cl100k_base")
+        expected = len(enc.encode(text))
+        actual = b.count_tokens(text)
+        self.assertLessEqual(abs(actual - expected) / expected, 0.2)
 
     def test_parse_front_matter_simple(self):
         text = "---\ntitle: Test\nkey: value\n---\nBody text"
@@ -157,6 +198,22 @@ class PipelineCTests(unittest.TestCase):
             self.assertTrue((tp / ".backups").exists())
             self.assertEqual(len(list((tp / ".backups").glob("*.bak"))), 1)
 
+    def test_wiki_rejects_html_injection(self):
+        payload = WikiUpdateResponse.model_validate(
+            {"action": "create", "page_md": "<script>alert(1)</script># Safe"}
+        )
+        assert "<script>" not in payload.page_md
+        assert "alert(1)" in payload.page_md
+
+    def test_no_npx_subprocess_anywhere(self):
+        src_root = Path(__file__).resolve().parent.parent / "src" / "guides"
+        offenders = []
+        for path in src_root.rglob("*.py"):
+            text = path.read_text(encoding="utf-8")
+            if "npx " in text or '"npx"' in text or "'npx'" in text:
+                offenders.append(path)
+        assert offenders == []
+
 class PipelineETests(unittest.TestCase):
     def test_parse_front_matter_yaml(self):
         from guides.frontmatter import parse_frontmatter
@@ -282,6 +339,23 @@ class PipelineDTests(unittest.TestCase):
             with patch.object(Path, "exists", return_value=True):
                 self.assertEqual(d.main(["--mode", "summary"]), 0)
                 self.assertTrue(report_file.exists())
+
+    @patch("guides.pipelines.d_quality_check.call_llm_summary_check")
+    @patch("guides.pipelines.d_quality_check.get_state", return_value={"quality_checked": True, "qc_hash": "same"})
+    @patch("guides.pipelines.d_quality_check.get_settings")
+    def test_quality_check_skips_unchanged(self, mock_settings, mock_state, mock_call):
+        from tempfile import TemporaryDirectory
+        with TemporaryDirectory() as tmpdir:
+            tp = Path(tmpdir)
+            mock_settings.return_value = MagicMock(summaries_dir=tp, sources_dir=tp)
+            (tp / "s.md").write_text("sum")
+            src = tp / "s.md"
+            with patch.object(Path, "exists", return_value=True), patch(
+                "guides.pipelines.d_quality_check._qc_hash", return_value="same"
+            ):
+                res = d.check_summaries("s")
+                self.assertEqual(res, [])
+                mock_call.assert_not_called()
 
     @patch("guides.pipelines.b_summarize.call_llm_messages")
     @patch("guides.pipelines.b_summarize.get_smart_client")

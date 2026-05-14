@@ -1,6 +1,7 @@
 import unittest
 import json
 import sqlite3
+from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 from tempfile import TemporaryDirectory
 from unittest.mock import patch
@@ -229,6 +230,37 @@ class StateTests(unittest.TestCase):
         # Non-existent
         self.json_path.unlink()
         self.assertEqual(load_state_json(), {})
+
+    def test_concurrent_set_state_no_loss(self):
+        init_db()
+
+        def write_one(i: int):
+            import guides.state
+
+            if hasattr(guides.state._local, "conn"):
+                try:
+                    guides.state._local.conn.close()
+                except Exception:
+                    pass
+                delattr(guides.state._local, "conn")
+            set_state(f"slug-{i}", "content_hash", f"hash-{i}")
+
+        with ThreadPoolExecutor(max_workers=8) as pool:
+            list(pool.map(write_one, range(20)))
+
+        for i in range(20):
+            self.assertEqual(get_state(f"slug-{i}")["content_hash"], f"hash-{i}")
+
+    def test_query_plan_uses_index(self):
+        init_db()
+        conn = sqlite3.connect(str(self.db_path))
+        rows = conn.execute(
+            "EXPLAIN QUERY PLAN SELECT slug FROM articles WHERE content_hash = ?",
+            ("hash",),
+        ).fetchall()
+        conn.close()
+        plan_text = " ".join(str(row) for row in rows).lower()
+        self.assertIn("index", plan_text)
 
 if __name__ == "__main__":
     unittest.main()

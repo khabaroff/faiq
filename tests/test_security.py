@@ -82,6 +82,14 @@ class URLSafetyTests(unittest.TestCase):
                 validate_url("http://private-host.com/")
 
     @patch("socket.getaddrinfo")
+    def test_fetch_url_blocks_metadata_ip(self, mock_getaddrinfo):
+        mock_getaddrinfo.return_value = [
+            (socket.AF_INET, socket.SOCK_STREAM, 6, "", ("169.254.169.254", 80))
+        ]
+        with self.assertRaisesRegex(ValueError, "restricted range|Host blocked"):
+            validate_url("http://metadata.example.com/latest/meta-data/")
+
+    @patch("socket.getaddrinfo")
     def test_validate_url_invalid_ip_format(self, mock_getaddrinfo):
         # Case where getaddrinfo returns something that ipaddress.ip_address doesn't like
         mock_getaddrinfo.return_value = [

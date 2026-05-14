@@ -10,6 +10,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "src"))
 
 from guides.llm import _should_retry, _WaitWithRetryAfter, call_llm
+from guides.json_extract import extract_json
 
 
 class FakeRetryState:
@@ -99,3 +100,8 @@ def test_429_retries_and_respects_retry_after():
     assert text == "hi"
     assert client.chat.completions.create.call_count == 2
     assert elapsed >= 0.08  # at least ~0.1s wait
+
+
+def test_extract_json_balanced_brace():
+    payload = 'prefix {"a":"x { y }", "nested":{"b":1}} suffix {"ignored":true}'
+    assert extract_json(payload) == {"a": "x { y }", "nested": {"b": 1}}

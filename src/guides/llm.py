@@ -23,11 +23,7 @@ logger = logging.getLogger(__name__)
 def count_tokens(text: str, model: str = "gpt-4o") -> int:
     try:
         import tiktoken
-        try:
-            enc = tiktoken.encoding_for_model(model)
-        except KeyError:
-            logger.warning("No encoding found for model %s, using cl100k_base", model)
-            enc = tiktoken.get_encoding("cl100k_base")
+        enc = tiktoken.get_encoding("cl100k_base")
         return len(enc.encode(text))
     except Exception as e:
         logger.warning("tiktoken failed: %s. Falling back to length-based estimation.", e)
@@ -39,10 +35,7 @@ def count_tokens(text: str, model: str = "gpt-4o") -> int:
 def truncate_to_tokens(text: str, max_tokens: int, model: str = "gpt-4o") -> str:
     try:
         import tiktoken
-        try:
-            enc = tiktoken.encoding_for_model(model)
-        except KeyError:
-            enc = tiktoken.get_encoding("cl100k_base")
+        enc = tiktoken.get_encoding("cl100k_base")
         tokens = enc.encode(text)
         if len(tokens) <= max_tokens:
             return text

@@ -10,33 +10,37 @@ from tempfile import TemporaryDirectory
 from unittest.mock import Mock, patch
 
 from guides.fetch.base import QueueItem, SourceKind
-from guides.fetch.url import _try_jina, fetch_url
+from guides.fetch.url import JinaFetcher, fetch_url
+from guides.fetch.youtube import fetch_youtube
 
 
 class FetchUrlTests(unittest.TestCase):
     def test_trafilatura_is_used_first(self) -> None:
         item = QueueItem(source="https://example.com/post", source_kind=SourceKind.URL, received_at=datetime.now())
 
-        with patch("guides.fetch.url.trafilatura.fetch_url", return_value="<html>body</html>"), patch(
-            "guides.fetch.url.trafilatura.extract", return_value="extracted body " + ("x" * 200)
-        ) as extract_mock:
+        with patch("guides.fetch.url.validate_url", side_effect=lambda url: url), patch(
+            "guides.fetch.url.trafilatura.fetch_url", return_value="<html>body</html>"
+        ), patch("guides.fetch.url.trafilatura.extract", return_value="extracted body " + ("x" * 200)) as extract_mock:
             fetch_url(item)
 
         self.assertTrue(extract_mock.called)
 
-    def test_cloudflare_markdown_is_preferred_before_jina(self) -> None:
+    def test_jina_is_used_after_trafilatura_failure(self) -> None:
         item = QueueItem(source="https://example.com/post", source_kind=SourceKind.URL, received_at=datetime.now())
 
-        with patch("guides.fetch.url._try_trafilatura", return_value=None), patch(
-            "guides.fetch.url._try_cloudflare_markdown", return_value=("cloudflare body", "cloudflare-markdown")
-        ) as cloudflare_mock, patch("guides.fetch.url._try_jina") as jina_mock:
-            jina_mock.side_effect = AssertionError("jina should not be called when cloudflare succeeds")
+        with patch("guides.fetch.url.validate_url", side_effect=lambda url: url), patch(
+            "guides.fetch.url.trafilatura.fetch_url", return_value=None
+        ), patch("guides.fetch.url.trafilatura.extract", return_value=None), patch(
+            "guides.fetch.url.get_http_client"
+        ) as client_mock, patch("guides.fetch.url.throttle_jina_reader"):
+            client = Mock()
+            client.get.return_value = Mock(status_code=200, text="jina body " + ("x" * 220))
+            client_mock.return_value = client
 
             content = fetch_url(item)
 
-        self.assertEqual(content.raw_text, "cloudflare body")
-        self.assertEqual(content.source_meta["fetcher"], "cloudflare-markdown")
-        self.assertTrue(cloudflare_mock.called)
+        self.assertIn("jina body", content.raw_text)
+        self.assertEqual(content.source_meta["fetcher"], "jina")
 
     def test_local_file_source_uses_source_frontmatter_title(self) -> None:
         with TemporaryDirectory() as tmpdir:
@@ -59,18 +63,45 @@ Body text
         self.assertEqual(content.source_meta["title"], "Implementing Claude Code Skills from Scratch")
         self.assertTrue(re.search(r"Implementing Claude Code Skills from Scratch", content.raw_text))
 
+    def test_youtube_rejects_file_scheme(self) -> None:
+        item = QueueItem(source="file:///etc/passwd", source_kind=SourceKind.URL, received_at=datetime.now())
+        with self.assertRaises(ValueError):
+            import asyncio
+
+            asyncio.run(fetch_youtube(item))
+
     def test_jina_reader_does_not_use_bearer_auth(self) -> None:
         response = Mock(status_code=200, text="x" * 250)
 
         with patch.dict("os.environ", {"JINA_API_KEY": "jina-test-token"}, clear=False), patch(
-            "guides.fetch.url.httpx.get", return_value=response
-        ) as get_mock:
-            content = _try_jina("https://www.example.com")
+            "guides.fetch.url.get_http_client"
+        ) as client_mock, patch("guides.fetch.url.validate_url", side_effect=lambda url: url), patch(
+            "guides.fetch.url.throttle_jina_reader"
+        ):
+            client = Mock()
+            client.get.return_value = response
+            client_mock.return_value = client
+            content = JinaFetcher().fetch(
+                QueueItem(source="https://www.example.com", source_kind=SourceKind.URL, received_at=datetime.now())
+            )
 
-        self.assertEqual(content, ("x" * 250, "jina"))
-        self.assertEqual(get_mock.call_args.args[0], "https://r.jina.ai/https://www.example.com")
-        self.assertEqual(get_mock.call_args.kwargs["headers"]["Accept"], "text/markdown")
-        self.assertNotIn("Authorization", get_mock.call_args.kwargs["headers"])
+        self.assertEqual(content.raw_text, "x" * 250)
+        self.assertEqual(client.get.call_args.args[0], "https://r.jina.ai/https://www.example.com")
+        self.assertEqual(client.get.call_args.kwargs["headers"]["Accept"], "text/markdown")
+        self.assertNotIn("Authorization", client.get.call_args.kwargs["headers"])
+
+    @patch("guides.fetch.github.validate_url")
+    def test_github_blocks_internal_url(self, mock_validate_url) -> None:
+        from guides.fetch.github import fetch_github_repo
+
+        mock_validate_url.side_effect = ValueError("Host blocked")
+        item = QueueItem(
+            source="http://169.254.169.254/root/repo",
+            source_kind=SourceKind.URL,
+            received_at=datetime.now(),
+        )
+        with self.assertRaisesRegex(ValueError, "Host blocked"):
+            fetch_github_repo(item)
 
 
 class JinaHelpersTests(unittest.TestCase):
