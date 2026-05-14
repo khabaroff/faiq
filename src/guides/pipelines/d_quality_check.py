@@ -97,7 +97,7 @@ def _call_qc_single(prompt_template: str, source_text: str, summary_text: str, s
     else:
         prompt = prompt_template + input_block
 
-    s = Settings()
+    s = get_settings()
     deployment = s.azure_deployment_fast or s.azure_deployment_smart
 
     system = "Ты — эксперт по качеству технической документации. Твоя задача — проверить соответствие саммари исходному тексту. Верни только JSON."
@@ -136,7 +136,7 @@ def call_llm_wiki_clean(page_text: str, slug: str) -> dict:
 
     prompt = prompt_template + f"\n\n## Вход\n\n### Wiki Page ({slug})\n{page_text}"
 
-    s = Settings()
+    s = get_settings()
     deployment = s.azure_deployment_fast or s.azure_deployment_smart
 
     system = "Ты — редактор технической вики. Твоя задача — очистить страницу от дублей и битых ссылок. Верни только JSON."
