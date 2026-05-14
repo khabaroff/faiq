@@ -107,7 +107,8 @@ class ToolTests(unittest.TestCase):
             sum_dir.mkdir(parents=True)
             (sum_dir / "target.md").write_text("target content")
             
-            with patch("guides.tools.link_checker.TARGET_DIRS", [sum_dir]):
+            with patch("guides.tools.link_checker.get_settings") as mock_settings:
+                mock_settings.return_value = MagicMock(summaries_dir=sum_dir, tools_dir=sum_dir, techniques_dir=sum_dir)
                 self.assertIsNotNone(link_checker.resolve_link("Target"))
                 self.assertIsNone(link_checker.resolve_link("Missing"))
                 
@@ -122,24 +123,22 @@ class ToolTests(unittest.TestCase):
         self.assertEqual(fm["tools"], ["T1"])
         self.assertEqual(build_indexes.parse_front_matter_yaml("No FM"), {})
 
-    @patch("guides.tools.build_indexes.SUMMARIES_DIR")
-    @patch("guides.tools.build_indexes.INDEX_DIR")
-    def test_build_indexes_main(self, mock_index, mock_sum):
+    @patch("guides.tools.build_indexes.get_settings")
+    def test_build_indexes_main(self, mock_settings):
         with TemporaryDirectory() as tmpdir:
             tp = Path(tmpdir)
-            mock_sum.exists.return_value = True
             sum_file = tp / "s1.md"
             sum_file.write_text("---\ntitle: T1\ntools: [Tool1]\n---\nBody")
-            mock_sum.glob.return_value = [sum_file]
-            
             out_dir = tp / "index"
-            out_dir.mkdir() # Actually create it
-            mock_index.mkdir.return_value = None
-            mock_index.__truediv__.side_effect = lambda x: out_dir / x
-            
-            with patch("guides.tools.build_indexes.TOOLS_DIR", tp / "tools"):
-                self.assertEqual(build_indexes.main([]), 0)
-                self.assertTrue((out_dir / "tools.md").exists())
+            out_dir.mkdir()
+            mock_settings.return_value = MagicMock(
+                summaries_dir=tp,
+                public_dir=tp,
+                tools_dir=tp / "tools",
+                techniques_dir=tp / "techniques",
+            )
+            self.assertEqual(build_indexes.main([]), 0)
+            self.assertTrue((out_dir / "tools.md").exists())
 
 if __name__ == "__main__":
     unittest.main()

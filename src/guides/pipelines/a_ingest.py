@@ -31,7 +31,7 @@ from guides.fetch.pdf import fetch_pdf
 from guides.fetch.url import fetch_url
 from guides.fetch.youtube import fetch_youtube
 from guides.security.fs_safety import assert_safe_slug, safe_join
-from guides.settings import Settings
+from guides.settings import get_settings
 from guides.state import find_by_content_hash, set_state
 from guides.utils.slugify import slugify
 
@@ -252,7 +252,7 @@ def main(argv=None) -> int:
     parser.add_argument("--repo", help="GitHub repo to ingest")
     args = parser.parse_args(argv)
 
-    settings = Settings()
+    settings = get_settings()
 
     items = []
     if args.url:

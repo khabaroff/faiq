@@ -4,8 +4,8 @@ from functools import lru_cache
 @lru_cache(maxsize=1)
 def _get_secret_tokens() -> tuple[str, ...]:
     try:
-        from guides.settings import Settings
-        s = Settings()
+        from guides.settings import get_settings
+        s = get_settings()
         return tuple(
             t for t in (
                 s.telegram_bot_token,

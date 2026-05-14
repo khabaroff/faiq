@@ -18,12 +18,7 @@ from guides.atomic_write import atomic_write_text
 
 logger = logging.getLogger(__name__)
 
-ROOT = Path(__file__).resolve().parent.parent.parent.parent
-CONTENT_DIR = ROOT / "public"
-SUMMARIES_DIR = CONTENT_DIR / "summaries"
-INDEX_DIR = CONTENT_DIR / "index"
-TOOLS_DIR = CONTENT_DIR / "tools"
-TECH_DIR = CONTENT_DIR / "techniques"  # Pipeline C uses 'techniques' for patterns
+from guides.settings import get_settings
 
 
 def slugify(name: str) -> str:
@@ -46,6 +41,7 @@ def parse_front_matter_yaml(text: str) -> dict:
 
 
 def main(argv: list[str] | None = None) -> int:
+    settings = get_settings()
     parser = argparse.ArgumentParser(description="Build semantic indexes")
     parser.add_argument("--summaries", help="Path to summaries directory")
     parser.add_argument("--index-dir", help="Path to index output directory")
@@ -53,10 +49,10 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--tech-dir", help="Path to techniques directory")
     args = parser.parse_args(argv)
 
-    summaries_dir = Path(args.summaries) if args.summaries else SUMMARIES_DIR
-    index_dir = Path(args.index_dir) if args.index_dir else INDEX_DIR
-    tools_dir = Path(args.tools_dir) if args.tools_dir else TOOLS_DIR
-    tech_dir = Path(args.tech_dir) if args.tech_dir else TECH_DIR
+    summaries_dir = Path(args.summaries) if args.summaries else settings.summaries_dir
+    index_dir = Path(args.index_dir) if args.index_dir else settings.public_dir / "index"
+    tools_dir = Path(args.tools_dir) if args.tools_dir else settings.tools_dir
+    tech_dir = Path(args.tech_dir) if args.tech_dir else settings.techniques_dir
 
     if not summaries_dir.exists():
         logger.error(f"Summaries directory not found: {summaries_dir}")

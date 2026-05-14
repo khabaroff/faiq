@@ -3,7 +3,7 @@ import httpx
 from guides.fetch.base import FetchedContent, QueueItem, SourceType
 from guides.fetch.jina import get_jina_reader_headers, get_jina_reader_url, throttle_jina_reader
 from guides.security.url_safety import validate_url
-from guides.settings import Settings
+from guides.settings import get_settings
 
 
 def fetch_github_gist(item: QueueItem) -> FetchedContent:
@@ -121,7 +121,7 @@ def fetch_github_repo(item: QueueItem) -> FetchedContent:
 def _get_headers() -> dict[str, str]:
     headers = {"Accept": "application/vnd.github.v3+json"}
     try:
-        token = Settings().github_token
+        token = get_settings().github_token
         if token:
             headers["Authorization"] = f"token {token}"
     except Exception:

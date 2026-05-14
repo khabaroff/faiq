@@ -12,10 +12,10 @@ import yaml
 from guides.atomic_write import atomic_write_text
 from guides.models import ArticleState
 
-ROOT = Path(__file__).resolve().parent.parent.parent
-STATE_DIR = ROOT / "state"
-DB_PATH = STATE_DIR / "articles.db"
-JSON_STATE = STATE_DIR / "index.json"
+# Module-level paths (tests monkeypatch these)
+STATE_DIR: Path = Path(__file__).resolve().parent.parent.parent / "state"
+DB_PATH: Path = STATE_DIR / "articles.db"
+JSON_STATE: Path = STATE_DIR / "index.json"
 
 _local = threading.local()
 

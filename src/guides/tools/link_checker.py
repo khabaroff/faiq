@@ -14,14 +14,7 @@ import re
 import sys
 from pathlib import Path
 
-ROOT = Path(__file__).resolve().parent.parent.parent.parent
-
-SOURCES_DIR = ROOT / "public" / "sources"
-SUMMARIES_DIR = ROOT / "public" / "summaries"
-TOOLS_DIR = ROOT / "public" / "tools"
-TECH_DIR = ROOT / "public" / "techniques"
-
-TARGET_DIRS = (SUMMARIES_DIR, TOOLS_DIR, TECH_DIR)
+from guides.settings import get_settings
 
 WIKILINK_RE = re.compile(r"\[\[([^\]]+)\]\]")
 
@@ -34,10 +27,15 @@ def slugify(name: str) -> str:
     return s.strip("-")
 
 
+def _target_dirs():
+    settings = get_settings()
+    return (settings.summaries_dir, settings.tools_dir, settings.techniques_dir)
+
+
 def resolve_link(target: str) -> Path | None:
     """Return the first existing file for the wikilink target, or None."""
     slug = slugify(target)
-    for d in TARGET_DIRS:
+    for d in _target_dirs():
         p = d / f"{slug}.md"
         if p.exists():
             return p
@@ -75,9 +73,10 @@ def main() -> int:
                     help="create empty stub pages for broken links")
     args = ap.parse_args()
 
+    settings = get_settings()
     all_broken: list[tuple[Path, int, str]] = []  # (file, line, target)
 
-    for d in TARGET_DIRS:
+    for d in _target_dirs():
         if not d.exists():
             continue
         for f in sorted(d.glob("*.md")):
@@ -89,15 +88,15 @@ def main() -> int:
         return 0
 
     for f, lineno, target in all_broken:
-        rel = f.relative_to(ROOT)
+        rel = f.relative_to(settings.public_dir)
         print(f"{rel}:{lineno} -> [[{target}]]")
 
     if args.create_stubs:
         created = 0
         for _, _, target in all_broken:
             # Place stubs in summaries/ by default
-            dest = create_stub(target, SUMMARIES_DIR)
-            print(f"  created stub: {dest.relative_to(ROOT)}")
+            dest = create_stub(target, settings.summaries_dir)
+            print(f"  created stub: {dest.relative_to(settings.public_dir)}")
             created += 1
         print(f"\nCreated {created} stub pages.")
 

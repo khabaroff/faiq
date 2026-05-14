@@ -52,8 +52,8 @@ def _get_jina_api_key() -> str | None:
         return env_token
 
     try:
-        from guides.settings import Settings
+        from guides.settings import get_settings
 
-        return Settings().jina_api_key
+        return get_settings().jina_api_key
     except Exception:
         return None

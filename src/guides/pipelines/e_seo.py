@@ -20,20 +20,16 @@ from pathlib import Path
 from guides.frontmatter import parse_frontmatter
 from guides.llm import call_llm, get_smart_client, load_prompt
 from guides.models import SeoResponse
-from guides.settings import Settings
+from guides.settings import get_settings, Settings
 from guides.state import get_state, set_state, update_frontmatter
 from guides.json_extract import extract_json
 
 logger = logging.getLogger(__name__)
 
-settings = Settings()
-SUMMARIES_DIR = settings.summaries_dir
-SOURCES_DIR = settings.sources_dir
-
 
 @_cache
 def _s() -> Settings:
-    return Settings()
+    return get_settings()
 
 
 _extract_json = extract_json
@@ -71,7 +67,8 @@ def call_llm_seo(fm: dict, body: str) -> dict:
 
 
 def optimize_one(slug: str) -> bool:
-    summary_path = SUMMARIES_DIR / f"{slug}.md"
+    settings = get_settings()
+    summary_path = settings.summaries_dir / f"{slug}.md"
     if not summary_path.exists():
         return False
 
@@ -80,7 +77,7 @@ def optimize_one(slug: str) -> bool:
 
     # Try to get title from source if not in summary fm
     if not fm.get("title"):
-        source_path = SOURCES_DIR / f"{slug}.md"
+        source_path = settings.sources_dir / f"{slug}.md"
         if source_path.exists():
             src_fm, _ = parse_frontmatter(source_path.read_text(encoding="utf-8"))
             fm["title"] = src_fm.get("title")
@@ -107,10 +104,11 @@ def main(argv=None) -> int:
     if args.slug:
         slugs = [args.slug]
     else:
-        if not SUMMARIES_DIR.exists():
-            print(f"Summaries dir does not exist: {SUMMARIES_DIR}")
+        settings = get_settings()
+        if not settings.summaries_dir.exists():
+            print(f"Summaries dir does not exist: {settings.summaries_dir}")
             return 1
-        slugs = [p.stem for p in SUMMARIES_DIR.glob("*.md")]
+        slugs = [p.stem for p in settings.summaries_dir.glob("*.md")]
 
     processed_count = 0
     for slug in slugs:

@@ -3,11 +3,11 @@ import shutil
 import subprocess
 from datetime import datetime
 
-from guides.settings import Settings
+from guides.settings import get_settings
 
 
 def backup_db() -> None:
-    s = Settings()
+    s = get_settings()
     db_path = s.state_dir / "articles.db"
     if not db_path.exists():
         print("DB not found, skipping backup.")

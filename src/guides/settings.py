@@ -1,3 +1,4 @@
+from functools import lru_cache
 from pathlib import Path
 
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -53,3 +54,8 @@ class Settings(BaseSettings):
         return self.public_dir / "images"
 
     model_config = SettingsConfigDict(env_file=".env")
+
+
+@lru_cache(maxsize=1)
+def get_settings() -> Settings:
+    return Settings()

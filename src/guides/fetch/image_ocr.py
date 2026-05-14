@@ -20,9 +20,9 @@ from pydantic import BaseModel
 
 from guides.llm import call_smart_with_images
 from guides.security.url_safety import validate_url
-from guides.settings import Settings
+from guides.settings import get_settings
 
-settings = Settings()
+settings = get_settings()
 ASSETS_DIR = settings.sources_dir / "_assets"
 CACHE_DB_PATH = settings.state_dir / "ocr_cache.sqlite"
 RUNS_LOG_PATH = settings.logs_dir / "ocr_runs.jsonl"

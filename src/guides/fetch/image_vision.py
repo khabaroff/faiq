@@ -5,7 +5,7 @@ import logging
 from pathlib import Path
 
 from guides.llm import call_llm_with_images, get_smart_client, load_prompt
-from guides.settings import Settings
+from guides.settings import get_settings
 from guides.json_extract import extract_json
 
 logger = logging.getLogger(__name__)
@@ -19,7 +19,7 @@ def is_image(path: Path) -> bool:
 
 def analyze_image(image_path: Path) -> dict:
     """Send image to LLM vision. Returns dict with title, description, extracted_text, concepts."""
-    s = Settings()
+    s = get_settings()
     prompt = load_prompt("image_analysis.md")
     system = "You are a visual content analyst. Return only valid JSON."
 

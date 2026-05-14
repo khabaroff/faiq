@@ -15,7 +15,7 @@ from tenacity import (
 )
 from tenacity.wait import wait_base
 
-from guides.settings import Settings
+from guides.settings import get_settings
 
 logger = logging.getLogger(__name__)
 
@@ -50,11 +50,6 @@ def truncate_to_tokens(text: str, max_tokens: int, model: str = "gpt-4o") -> str
     except Exception:
         # Fallback to rough char truncation
         return text[:max_tokens * 2]
-
-
-@lru_cache(maxsize=1)
-def _get_settings() -> Settings:
-    return Settings()
 
 
 class UsageRecord(NamedTuple):
@@ -102,7 +97,7 @@ def record_to_log_extra(rec: UsageRecord) -> dict:
 
 @lru_cache(maxsize=1)
 def _client() -> AzureOpenAI:
-    s = Settings()
+    s = get_settings()
     return AzureOpenAI(
         api_key=s.azure_openai_api_key,
         azure_endpoint=s.azure_openai_endpoint,
@@ -271,12 +266,12 @@ def call_llm_with_images(
 
 
 def call_smart(prompt: str, system: str = "") -> tuple[str, UsageRecord]:
-    s = _get_settings()
+    s = get_settings()
     return call_llm(_client(), s.azure_deployment_smart, prompt, system)
 
 
 def call_fast(prompt: str, system: str = "") -> tuple[str, UsageRecord]:
-    s = _get_settings()
+    s = get_settings()
     deployment = s.azure_deployment_fast or s.azure_deployment_smart
     return call_llm(_client(), deployment, prompt, system)
 
@@ -284,7 +279,7 @@ def call_fast(prompt: str, system: str = "") -> tuple[str, UsageRecord]:
 def call_smart_with_images(
     prompt: str, image_paths: Sequence[Path], system: str = "", return_usage: bool = False
 ) -> str | tuple[str, UsageRecord]:
-    s = _get_settings()
+    s = get_settings()
     text, usage = call_llm_with_images(_client(), s.azure_deployment_smart, prompt, image_paths, system)
     if return_usage:
         return text, usage
@@ -293,5 +288,5 @@ def call_smart_with_images(
 
 @lru_cache(maxsize=64)
 def load_prompt(filename: str) -> str:
-    s = _get_settings()
+    s = get_settings()
     return (s.prompts_dir / filename).read_text(encoding="utf-8")

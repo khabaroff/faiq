@@ -21,21 +21,11 @@ from pathlib import Path
 from guides.atomic_write import atomic_write_text
 from guides.llm import call_llm, count_tokens, get_smart_client, load_prompt, truncate_to_tokens
 from guides.models import SummaryCheckResponse, WikiCleanResponse
-from guides.settings import Settings
+from guides.settings import get_settings
 from guides.state import get_state, set_state, update_frontmatter
 from guides.json_extract import extract_json
 
 logger = logging.getLogger(__name__)
-
-settings = Settings()
-ROOT = Path(__file__).resolve().parent.parent.parent.parent
-QC_REPORT = settings.state_dir / "quality-report.json"
-
-# Content paths
-SOURCES_DIR = settings.sources_dir
-SUMMARIES_DIR = settings.summaries_dir
-TOOLS_DIR = settings.tools_dir
-TECH_DIR = settings.techniques_dir
 
 MAX_QC_TOKENS = 8000
 CHUNK_OVERLAP = 500
@@ -157,17 +147,18 @@ def call_llm_wiki_clean(page_text: str, slug: str) -> dict:
 
 
 def check_summaries(slug_filter: str | None = None) -> list[dict]:
+    settings = get_settings()
     results = []
     if slug_filter:
-        sum_files = [SUMMARIES_DIR / f"{slug_filter}.md"]
+        sum_files = [settings.summaries_dir / f"{slug_filter}.md"]
     else:
-        sum_files = list(SUMMARIES_DIR.glob("*.md"))
+        sum_files = list(settings.summaries_dir.glob("*.md"))
 
     for sum_path in sum_files:
         if not sum_path.exists():
             continue
         slug = sum_path.stem
-        src_path = SOURCES_DIR / f"{slug}.md"
+        src_path = settings.sources_dir / f"{slug}.md"
         if not src_path.exists():
             logger.warning("Source for summary %s not found", slug)
             continue
@@ -194,17 +185,18 @@ def check_summaries(slug_filter: str | None = None) -> list[dict]:
 
 
 def clean_wiki_pages(slug_filter: str | None = None) -> list[dict]:
+    settings = get_settings()
     results = []
 
     targets = []
     if slug_filter:
-        for d in (TOOLS_DIR, TECH_DIR):
+        for d in (settings.tools_dir, settings.techniques_dir):
             p = d / f"{slug_filter}.md"
             if p.exists():
                 targets.append(p)
     else:
-        targets.extend(list(TOOLS_DIR.glob("*.md")))
-        targets.extend(list(TECH_DIR.glob("*.md")))
+        targets.extend(list(settings.tools_dir.glob("*.md")))
+        targets.extend(list(settings.techniques_dir.glob("*.md")))
 
     for page in targets:
         slug = page.stem
@@ -219,7 +211,7 @@ def clean_wiki_pages(slug_filter: str | None = None) -> list[dict]:
             res = call_llm_wiki_clean(page_text, slug)
             res["slug"] = slug
             res["mode"] = "wiki_clean"
-            res["path"] = str(page.relative_to(ROOT))
+            res["path"] = str(page.relative_to(settings.public_dir))
             res["qc_hash"] = new_hash
 
             if res.get("verdict") == "needs_cleanup" and "cleaned_page_md" in res:
@@ -267,20 +259,22 @@ def main(argv=None) -> int:
                     set_state(slug, "status", "quality_ok")
 
     # Update frontmatter for all non-error results
+    settings = get_settings()
     for res in all_results:
         if res.get("verdict") != "error":
             slug = res["slug"]
-            summary_path = SUMMARIES_DIR / f"{slug}.md"
+            summary_path = settings.summaries_dir / f"{slug}.md"
             if summary_path.exists():
                 update_frontmatter(summary_path, {"status": "quality_ok" if res.get("verdict") == "ok" else "quality_needs_review"})
 
-    QC_REPORT.parent.mkdir(parents=True, exist_ok=True)
-    atomic_write_text(QC_REPORT, json.dumps({
+    qc_report = settings.state_dir / "quality-report.json"
+    qc_report.parent.mkdir(parents=True, exist_ok=True)
+    atomic_write_text(qc_report, json.dumps({
         "ts": date.today().isoformat(),
         "results": all_results,
     }, ensure_ascii=False, indent=2), encoding="utf-8")
 
-    print(f"\nDone. Report saved to {QC_REPORT}")
+    print(f"\nDone. Report saved to {qc_report}")
     return 0
 
 

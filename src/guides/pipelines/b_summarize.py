@@ -32,7 +32,7 @@ import yaml
 from guides.atomic_write import atomic_write_text
 from guides.frontmatter import parse_frontmatter
 from guides.llm import call_llm_messages, count_tokens, get_smart_client, load_prompt
-from guides.settings import Settings
+from guides.settings import get_settings, Settings
 from guides.tools.daily_log import append_log_entry
 
 logger = logging.getLogger(__name__)
@@ -40,11 +40,8 @@ logger = logging.getLogger(__name__)
 
 @_cache
 def _s() -> Settings:
-    return Settings()
+    return get_settings()
 
-settings = _s()
-SOURCES_DIR = settings.sources_dir
-SUMMARIES_DIR = settings.summaries_dir
 
 MAX_RETRIES = 3
 _CORRECTION = (
@@ -162,7 +159,8 @@ def call_llm_summary(slug: str, source_text: str, source_url: str, source_type: 
 
 
 def summarize_one(slug: str) -> Path:
-    src = SOURCES_DIR / f"{slug}.md"
+    settings = get_settings()
+    src = settings.sources_dir / f"{slug}.md"
     if not src.exists():
         raise FileNotFoundError(src)
 
@@ -197,7 +195,8 @@ def summarize_one(slug: str) -> Path:
 
     fm_str = "---\n" + yaml.safe_dump(canonical_fm, allow_unicode=True, default_flow_style=False) + "---\n\n"
 
-    out = SUMMARIES_DIR / f"{slug}.md"
+    settings = get_settings()
+    out = settings.summaries_dir / f"{slug}.md"
     out.parent.mkdir(parents=True, exist_ok=True)
     atomic_write_text(out, fm_str + llm_body)
     return out
@@ -205,7 +204,8 @@ def summarize_one(slug: str) -> Path:
 
 def _summarize_slug(slug: str, force: bool) -> str | None:
     from guides.state import set_state
-    if not force and (SUMMARIES_DIR / f"{slug}.md").exists():
+    settings = get_settings()
+    if not force and (settings.summaries_dir / f"{slug}.md").exists():
         return None
     out = summarize_one(slug)
     set_state(slug, "summarized_at", date.today().isoformat())
@@ -225,10 +225,11 @@ def main(argv=None) -> int:
     if args.slug:
         slugs = [args.slug]
     else:
-        if not SOURCES_DIR.exists():
-            print(f"Sources dir does not exist: {SOURCES_DIR}")
+        settings = get_settings()
+        if not settings.sources_dir.exists():
+            print(f"Sources dir does not exist: {settings.sources_dir}")
             return 1
-        slugs = [p.stem for p in SOURCES_DIR.glob("*.md")]
+        slugs = [p.stem for p in settings.sources_dir.glob("*.md")]
 
     if args.batch > 0:
         slugs = slugs[:args.batch]

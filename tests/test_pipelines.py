@@ -1,6 +1,6 @@
 import unittest
 from pathlib import Path
-from unittest.mock import patch, Mock
+from unittest.mock import patch, Mock, MagicMock
 import json
 
 import guides.pipelines.b_summarize as b
@@ -98,7 +98,8 @@ class PipelineCTests(unittest.TestCase):
             self.assertIn("# N", Path(tmp.name).read_text())
 
     @patch("guides.pipelines.c_wiki_update.call_llm_update")
-    def test_propagate_summary_rewrite_description(self, mock_call):
+    @patch("guides.pipelines.c_wiki_update.get_settings")
+    def test_propagate_summary_rewrite_description(self, mock_settings, mock_call):
         from tempfile import TemporaryDirectory
         with TemporaryDirectory() as tmpdir:
             tp = Path(tmpdir)
@@ -108,17 +109,15 @@ class PipelineCTests(unittest.TestCase):
             tools_dir.mkdir()
             tech_dir = tp / "tech"
             tech_dir.mkdir()
-            with patch("guides.pipelines.c_wiki_update.SUMMARIES_DIR", sum_dir), \
-                 patch("guides.pipelines.c_wiki_update.WIKI_TOOLS_DIR", tools_dir), \
-                 patch("guides.pipelines.c_wiki_update.WIKI_TECH_DIR", tech_dir):
-                (sum_dir / "s.md").write_text("---\ntools: [T]\n---\nB")
-                (tools_dir / "t.md").write_text("---\nname: T\n---\n# T\n\n## Что это\n\nOld")
-                mock_call.return_value = {
-                    "action": "rewrite_description",
-                    "page_md": "---\nname: T\n---\n# T\n\n## Что это\n\nNew\n\n## Упоминания\n\n- [s](../summaries/s.md)"
-                }
-                self.assertEqual(c.propagate_summary("s"), 1)
-                self.assertIn("New", (tools_dir / "t.md").read_text())
+            mock_settings.return_value = MagicMock(summaries_dir=sum_dir, tools_dir=tools_dir, techniques_dir=tech_dir)
+            (sum_dir / "s.md").write_text("---\ntools: [T]\n---\nB")
+            (tools_dir / "t.md").write_text("---\nname: T\n---\n# T\n\n## Что это\n\nOld")
+            mock_call.return_value = {
+                "action": "rewrite_description",
+                "page_md": "---\nname: T\n---\n# T\n\n## Что это\n\nNew\n\n## Упоминания\n\n- [s](../summaries/s.md)"
+            }
+            self.assertEqual(c.propagate_summary("s"), 1)
+            self.assertIn("New", (tools_dir / "t.md").read_text())
 
     def test_canonicalize_slug_fuzzy(self):
         # 85+ score token_sort_ratio
@@ -153,12 +152,12 @@ class PipelineETests(unittest.TestCase):
         self.assertIn("TLDR text", e._render_seo_prompt({"title": "T"}, "## TL;DR\n\nTLDR text"))
 
     @patch("guides.pipelines.e_seo.call_llm_seo")
-    @patch("guides.pipelines.e_seo.SUMMARIES_DIR")
-    def test_optimize_one(self, mock_sum_dir, mock_call):
+    @patch("guides.pipelines.e_seo.get_settings")
+    def test_optimize_one(self, mock_settings, mock_call):
         from tempfile import TemporaryDirectory
         with TemporaryDirectory() as tmpdir:
             tp = Path(tmpdir)
-            mock_sum_dir.__truediv__.side_effect = lambda x: tp / x
+            mock_settings.return_value = MagicMock(summaries_dir=tp)
             (tp / "s.md").write_text("---\ntitle: T\n---\nB")
             mock_call.return_value = {"seo_title": "ST"}
             self.assertTrue(e.optimize_one("s"))
@@ -184,37 +183,37 @@ class PipelineGTests(unittest.TestCase):
         self.assertEqual(g._render_telegram_prompt({"title": "T"}), "T")
 
     @patch("guides.pipelines.g_telegram.call_llm_telegram", return_value="Post")
-    @patch("guides.pipelines.g_telegram.SUMMARIES_DIR")
-    def test_publish_one_dry_run(self, mock_sum_dir, mock_call):
+    @patch("guides.pipelines.g_telegram.get_settings")
+    def test_publish_one_dry_run(self, mock_settings, mock_call):
         from tempfile import TemporaryDirectory
         with TemporaryDirectory() as tmpdir:
             tp = Path(tmpdir)
-            mock_sum_dir.__truediv__.side_effect = lambda x: tp / x
+            mock_settings.return_value = MagicMock(summaries_dir=tp)
             (tp / "s.md").write_text("---\ntitle: T\n---\nB")
             self.assertTrue(g.publish_one("s", dry_run=True))
 
     @patch("guides.pipelines.g_telegram.send_telegram_message", return_value=True)
     @patch("guides.pipelines.g_telegram.call_llm_telegram", return_value="Post")
-    @patch("guides.pipelines.g_telegram.SUMMARIES_DIR")
+    @patch("guides.pipelines.g_telegram.get_settings")
     @patch("guides.pipelines.g_telegram.set_state")
     @patch("guides.pipelines.g_telegram.update_frontmatter")
-    def test_publish_one_real(self, mock_fm, mock_state, mock_sum_dir, mock_call, mock_send):
+    def test_publish_one_real(self, mock_fm, mock_state, mock_settings, mock_call, mock_send):
         from tempfile import TemporaryDirectory
         with TemporaryDirectory() as tmpdir:
             tp = Path(tmpdir)
-            mock_sum_dir.__truediv__.side_effect = lambda x: tp / x
+            mock_settings.return_value = MagicMock(summaries_dir=tp)
             (tp / "s.md").write_text("---\ntitle: T\n---\nB")
             self.assertTrue(g.publish_one("s", dry_run=False))
 
-    @patch("guides.pipelines.g_telegram.SUMMARIES_DIR")
+    @patch("guides.pipelines.g_telegram.get_settings")
     @patch("guides.pipelines.g_telegram.get_state", return_value={})
     @patch("guides.pipelines.g_telegram.publish_one", return_value=True)
-    def test_main(self, mock_pub, mock_state, mock_sum_dir):
+    def test_main(self, mock_pub, mock_state, mock_settings):
         from tempfile import TemporaryDirectory
         with TemporaryDirectory() as tmpdir:
             tp = Path(tmpdir)
-            mock_sum_dir.exists.return_value = True
-            mock_sum_dir.glob.return_value = [tp / "s.md"]
+            mock_settings.return_value = MagicMock(summaries_dir=tp, public_dir=tp)
+            (tp / "s.md").write_text("---\ntitle: T\n---\nB")
             self.assertEqual(g.main(["--slug", "s"]), 0)
 
 class PipelineDTests(unittest.TestCase):
@@ -224,13 +223,12 @@ class PipelineDTests(unittest.TestCase):
             d._extract_json("no json")
 
     @patch("guides.pipelines.d_quality_check.call_llm_summary_check")
-    @patch("guides.pipelines.d_quality_check.SUMMARIES_DIR")
-    @patch("guides.pipelines.d_quality_check.SOURCES_DIR")
-    def test_check_summaries(self, mock_src, mock_sum, mock_call):
+    @patch("guides.pipelines.d_quality_check.get_settings")
+    def test_check_summaries(self, mock_settings, mock_call):
         from tempfile import TemporaryDirectory
         with TemporaryDirectory() as tmpdir:
             tp = Path(tmpdir)
-            mock_sum.glob.return_value = [tp / "s.md"]
+            mock_settings.return_value = MagicMock(summaries_dir=tp, sources_dir=tp)
             (tp / "s.md").write_text("sum")
             with patch.object(Path, "exists", return_value=True):
                 mock_call.return_value = {"verdict": "ok"}
@@ -238,35 +236,31 @@ class PipelineDTests(unittest.TestCase):
                 self.assertEqual(len(res), 1)
 
     @patch("guides.pipelines.d_quality_check.call_llm_wiki_clean")
-    @patch("guides.pipelines.d_quality_check.TOOLS_DIR")
-    @patch("guides.pipelines.d_quality_check.TECH_DIR")
-    def test_clean_wiki_pages_cleanup(self, mock_tech, mock_tools, mock_call):
+    @patch("guides.pipelines.d_quality_check.get_settings")
+    def test_clean_wiki_pages_cleanup(self, mock_settings, mock_call):
         from tempfile import TemporaryDirectory
         with TemporaryDirectory() as tmpdir:
             tp = Path(tmpdir)
-            mock_tools.glob.return_value = [tp / "t1.md"]
-            mock_tech.glob.return_value = []
+            mock_settings.return_value = MagicMock(tools_dir=tp, techniques_dir=tp, public_dir=tp)
             p = tp / "t1.md"
             p.write_text("page")
             mock_call.return_value = {"verdict": "needs_cleanup", "cleaned_page_md": "clean"}
-            with patch("guides.pipelines.d_quality_check.ROOT", tp):
-                res = d.clean_wiki_pages()
-                self.assertEqual(res[0]["verdict"], "needs_cleanup")
-                self.assertEqual(p.read_text(), "clean")
+            res = d.clean_wiki_pages()
+            self.assertEqual(res[0]["verdict"], "needs_cleanup")
+            self.assertEqual(p.read_text(), "clean")
 
     @patch("guides.pipelines.d_quality_check.check_summaries", return_value=[{"slug": "s", "verdict": "ok"}])
     @patch("guides.pipelines.d_quality_check.clean_wiki_pages", return_value=[])
     @patch("guides.pipelines.d_quality_check.set_state")
     @patch("guides.pipelines.d_quality_check.update_frontmatter")
-    @patch("guides.pipelines.d_quality_check.SUMMARIES_DIR")
-    def test_main(self, mock_sum_dir, mock_fm, mock_state, mock_clean, mock_check):
+    @patch("guides.pipelines.d_quality_check.get_settings")
+    def test_main(self, mock_settings, mock_fm, mock_state, mock_clean, mock_check):
         from tempfile import TemporaryDirectory
         with TemporaryDirectory() as tmpdir:
             tp = Path(tmpdir)
             report_file = tp / "report.json"
-            mock_sum_dir.__truediv__.side_effect = lambda x: tp / x
-            with patch.object(Path, "exists", return_value=True), \
-                 patch("guides.pipelines.d_quality_check.QC_REPORT", report_file):
+            mock_settings.return_value = MagicMock(summaries_dir=tp, state_dir=tp)
+            with patch.object(Path, "exists", return_value=True):
                 self.assertEqual(d.main(["--mode", "summary"]), 0)
                 self.assertTrue(report_file.exists())
 

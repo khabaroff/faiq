@@ -39,18 +39,12 @@ from guides.frontmatter import parse_frontmatter
 from guides.llm import call_llm, get_smart_client, load_prompt
 from guides.models import WikiUpdateResponse
 from guides.security.fs_safety import assert_safe_slug, safe_join
-from guides.settings import Settings
+from guides.settings import get_settings, Settings
 from guides.tools.daily_log import append_log_entry
 from guides.json_extract import extract_json
 from guides.utils.slugify import slugify
 
 logger = logging.getLogger(__name__)
-
-settings = Settings()
-SUMMARIES_DIR = settings.summaries_dir
-WIKI_TOOLS_DIR = settings.tools_dir
-WIKI_TECH_DIR = settings.techniques_dir
-
 
 def _backup_page(page_path: Path) -> None:
     """Save copy of existing page before overwrite."""
@@ -64,7 +58,7 @@ def _backup_page(page_path: Path) -> None:
 
 @_cache
 def _s() -> Settings:
-    return Settings()
+    return get_settings()
 
 
 def canonicalize_slug(name: str, existing_slugs: list[str], item_type: str = "") -> str:
@@ -231,7 +225,8 @@ def append_mention_to_page(page_path: Path, new_mention: dict) -> None:
 
 
 def propagate_summary(slug: str, force: bool = False) -> int:
-    summary_path = SUMMARIES_DIR / f"{slug}.md"
+    settings = get_settings()
+    summary_path = settings.summaries_dir / f"{slug}.md"
     if not summary_path.exists():
         raise FileNotFoundError(summary_path)
 
@@ -240,8 +235,8 @@ def propagate_summary(slug: str, force: bool = False) -> int:
 
     processed = 0
     for kind, names, target_dir in (
-        ("tool", tools, WIKI_TOOLS_DIR),
-        ("pattern", patterns, WIKI_TECH_DIR),
+        ("tool", tools, settings.tools_dir),
+        ("pattern", patterns, settings.techniques_dir),
     ):
         if not target_dir.exists():
             target_dir.mkdir(parents=True, exist_ok=True)
@@ -335,10 +330,11 @@ def main(argv=None) -> int:
     if args.slug:
         slugs = [args.slug]
     else:
-        if not SUMMARIES_DIR.exists():
-            print(f"Summaries dir does not exist: {SUMMARIES_DIR}")
+        settings = get_settings()
+        if not settings.summaries_dir.exists():
+            print(f"Summaries dir does not exist: {settings.summaries_dir}")
             return 1
-        slugs = [p.stem for p in SUMMARIES_DIR.glob("*.md")]
+        slugs = [p.stem for p in settings.summaries_dir.glob("*.md")]
 
     if args.batch > 0:
         slugs = slugs[:args.batch]

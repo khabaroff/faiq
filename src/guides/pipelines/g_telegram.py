@@ -21,19 +21,16 @@ import httpx
 
 from guides.frontmatter import parse_frontmatter
 from guides.llm import call_llm, get_smart_client, load_prompt
-from guides.settings import Settings
+from guides.settings import get_settings, Settings
 from guides.state import get_state, set_state, update_frontmatter
 from guides.utils.redact import redact_tokens
 
 logger = logging.getLogger(__name__)
 
-settings = Settings()
-SUMMARIES_DIR = settings.summaries_dir
-
 
 @_cache
 def _s() -> Settings:
-    return Settings()
+    return get_settings()
 
 
 def _render_telegram_prompt(fm: dict) -> str:
@@ -92,7 +89,8 @@ def send_telegram_message(text: str) -> bool:
         raise
 
 def publish_one(slug: str, dry_run: bool = False) -> bool:
-    summary_path = SUMMARIES_DIR / f"{slug}.md"
+    settings = get_settings()
+    summary_path = settings.summaries_dir / f"{slug}.md"
     if not summary_path.exists():
         logger.error(f"Summary file not found: {summary_path}")
         return False
@@ -131,10 +129,11 @@ def main(argv=None) -> int:
         slugs = [args.slug]
     else:
         # Find all summaries
-        if not SUMMARIES_DIR.exists():
-            print(f"Summaries dir does not exist: {SUMMARIES_DIR}")
+        settings = get_settings()
+        if not settings.summaries_dir.exists():
+            print(f"Summaries dir does not exist: {settings.summaries_dir}")
             return 1
-        slugs = [p.stem for p in SUMMARIES_DIR.glob("*.md")]
+        slugs = [p.stem for p in settings.summaries_dir.glob("*.md")]
 
     processed_count = 0
     for slug in slugs:

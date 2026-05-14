@@ -4,13 +4,13 @@ from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Optional
 
-from guides.settings import Settings
+from guides.settings import get_settings
 
 _local = threading.local()
 
 def _get_conn() -> sqlite3.Connection:
     if not hasattr(_local, "conn"):
-        settings = Settings()
+        settings = get_settings()
         db_path = settings.state_dir / "fetch_cache.sqlite"
         settings.state_dir.mkdir(parents=True, exist_ok=True)
         conn = sqlite3.connect(str(db_path), timeout=5.0)
