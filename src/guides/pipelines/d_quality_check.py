@@ -169,7 +169,7 @@ def check_summaries(slug_filter: str | None = None) -> list[dict]:
             summary_text = sum_path.read_text(encoding="utf-8")
             new_hash = _qc_hash(source_text + summary_text)
             stored = get_state(slug)
-            if stored.get("qc_hash") == new_hash and stored.get("quality_checked"):
+            if (stored.get("d_hash") == new_hash or stored.get("qc_hash") == new_hash) and stored.get("quality_checked"):
                 print(f"  [skip] {slug} unchanged")
                 continue
             res = call_llm_summary_check(source_text, summary_text, slug)
@@ -205,7 +205,7 @@ def clean_wiki_pages(slug_filter: str | None = None) -> list[dict]:
             page_text = page.read_text(encoding="utf-8")
             new_hash = _qc_hash(page_text)
             stored = get_state(slug)
-            if stored.get("qc_hash") == new_hash and stored.get("quality_checked"):
+            if (stored.get("d_hash") == new_hash or stored.get("qc_hash") == new_hash) and stored.get("quality_checked"):
                 print(f"  [skip] {slug} unchanged")
                 continue
             res = call_llm_wiki_clean(page_text, slug)
@@ -253,6 +253,7 @@ def main(argv=None) -> int:
             set_state(slug, "quality_checked", True)
             if res.get("qc_hash"):
                 set_state(slug, "qc_hash", res["qc_hash"])
+                set_state(slug, "d_hash", res["qc_hash"])
             if res.get("verdict"):
                 set_state(slug, "quality", res["verdict"])
                 if res["verdict"] == "ok":

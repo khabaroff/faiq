@@ -84,6 +84,7 @@ def init_db() -> None:
          )
          """
      )
+     conn.execute("CREATE INDEX IF NOT EXISTS idx_articles_content_hash ON articles(content_hash)")
      conn.commit()
      # Add columns that may be missing in older DBs (migrations)
      for col, definition in _build_alter_columns():
@@ -125,8 +126,8 @@ def migrate_from_json() -> int:
 
 
 def _ensure_db() -> None:
+    init_db()
     if not DB_PATH.exists():
-        init_db()
         migrate_from_json()
 
 
@@ -149,6 +150,12 @@ def get_state(slug: str) -> dict[str, Any]:
         "quality": row["quality"],
         "quality_checked": bool(row["quality_checked"]),
         "qc_hash": row["qc_hash"],
+        "a_hash": row["a_hash"],
+        "b_hash": row["b_hash"],
+        "c_hash": row["c_hash"],
+        "d_hash": row["d_hash"],
+        "e_hash": row["e_hash"],
+        "g_hash": row["g_hash"],
         "status": row["status"],
         "revision_count": row["revision_count"],
         "last_edited_at": row["last_edited_at"],

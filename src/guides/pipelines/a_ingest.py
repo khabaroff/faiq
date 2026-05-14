@@ -22,6 +22,8 @@ import sys
 from datetime import datetime
 from pathlib import Path
 
+import yaml
+
 from guides.atomic_write import atomic_write_text
 from guides.fetch.base import QueueItem, SourceKind, SourceType, detect_source_type
 from guides.fetch.github import fetch_github_gist, fetch_github_repo
@@ -230,7 +232,11 @@ def process_item(item: QueueItem, settings: Settings) -> dict | None:
             "lang": fetched.source_meta.get("lang", "en"),
             "status": "draft",
         }
-        yaml_block = "---\n" + "\n".join(f"{k}: {v}" for k, v in frontmatter.items()) + "\n---\n\n"
+        yaml_block = (
+            "---\n"
+            + yaml.safe_dump(frontmatter, allow_unicode=True, default_flow_style=False, sort_keys=False)
+            + "---\n\n"
+        )
         atomic_write_text(out_path, yaml_block + raw_content)
 
         # 6. Archive
@@ -280,6 +286,7 @@ def main(argv=None) -> int:
             set_state(slug, "raw", True)
             if res.get("content_hash"):
                 set_state(slug, "content_hash", res["content_hash"])
+                set_state(slug, "a_hash", res["content_hash"])
             if res.get("source_type") == "image":
                 # Images are fully processed in A — skip Pipeline B
                 set_state(slug, "summarized_at", datetime.now().date().isoformat())

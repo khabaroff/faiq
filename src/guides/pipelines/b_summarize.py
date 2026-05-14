@@ -20,6 +20,7 @@ Usage:
 from __future__ import annotations
 
 import argparse
+import hashlib
 import logging
 import sys
 from concurrent.futures import ThreadPoolExecutor, as_completed
@@ -212,12 +213,18 @@ def summarize_one(slug: str, logger: Logger | None = None) -> Path:
 
 
 def _summarize_slug(slug: str, force: bool, logger: Logger | None = None) -> str | None:
-    from guides.state import set_state
+    from guides.state import get_state, set_state
     settings = get_settings()
-    if not force and (settings.summaries_dir / f"{slug}.md").exists():
+    src = settings.sources_dir / f"{slug}.md"
+    if not src.exists():
+        return None
+    src_hash = _compute_hash(src)
+    stored = get_state(slug)
+    if not force and stored.get("b_hash") == src_hash and (settings.summaries_dir / f"{slug}.md").exists():
         return None
     out = summarize_one(slug, logger=logger)
     set_state(slug, "summarized_at", date.today().isoformat())
+    set_state(slug, "b_hash", src_hash)
     set_state(slug, "status", "reviewed")
     return str(out)
 

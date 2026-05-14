@@ -296,6 +296,11 @@ def propagate_summary(slug: str, force: bool = False, logger: Logger | None = No
     return processed
 
 
+def _compute_hash(path: Path) -> str:
+    import hashlib
+    return hashlib.sha256(path.read_bytes()).hexdigest()[:16]
+
+
 def main(argv=None) -> int:
     ap = argparse.ArgumentParser()
     from guides.state import get_state, set_state
@@ -304,11 +309,11 @@ def main(argv=None) -> int:
     ap.add_argument("--force", action="store_true", help="re-propagate even if already propagated")
     ap.add_argument("--batch", type=int, default=0, help="limit to N items (0 = all)")
     args = ap.parse_args(argv)
+    settings = get_settings()
 
     if args.slug:
         slugs = [args.slug]
     else:
-        settings = get_settings()
         if not settings.summaries_dir.exists():
             print(f"Summaries dir does not exist: {settings.summaries_dir}")
             return 1
@@ -319,7 +324,13 @@ def main(argv=None) -> int:
 
     total_processed = 0
     for slug in slugs:
-        if not args.force and get_state(slug).get("wiki_propagated"):
+        summary_path = settings.summaries_dir / f"{slug}.md"
+        if summary_path.exists():
+            sum_hash = _compute_hash(summary_path)
+        else:
+            sum_hash = None
+        stored = get_state(slug)
+        if not args.force and stored.get("c_hash") == sum_hash and stored.get("wiki_propagated"):
             print(f"skip (propagated): {slug}")
             continue
         print(f"propagate: {slug}")
@@ -327,6 +338,7 @@ def main(argv=None) -> int:
             processed = propagate_summary(slug, args.force)
             set_state(slug, "wiki_propagated", True)
             set_state(slug, "wiki_propagated_at", date.today().isoformat())
+            set_state(slug, "c_hash", sum_hash)
             set_state(slug, "status", "propagated")
             total_processed += processed
         except Exception:

@@ -95,12 +95,18 @@ def optimize_one(slug: str) -> bool:
         return False
 
 
+def _compute_hash(path: Path) -> str:
+    import hashlib
+    return hashlib.sha256(path.read_bytes()).hexdigest()[:16]
+
+
 def main(argv=None) -> int:
     parser = argparse.ArgumentParser(description="Pipeline E: SEO Optimizer")
     parser.add_argument("--slug", help="Process only this slug")
     parser.add_argument("--force", action="store_true", help="Reprocess even if optimized")
     args = parser.parse_args(argv)
 
+    settings = get_settings()
     if args.slug:
         slugs = [args.slug]
     else:
@@ -112,12 +118,15 @@ def main(argv=None) -> int:
 
     processed_count = 0
     for slug in slugs:
+        summary_path = settings.summaries_dir / f"{slug}.md"
+        sum_hash = _compute_hash(summary_path) if summary_path.exists() else None
         state = get_state(slug)
-        if not args.force and state.get("seo_optimized"):
+        if not args.force and state.get("e_hash") == sum_hash and state.get("seo_optimized"):
             continue
 
         if optimize_one(slug):
             set_state(slug, "seo_optimized", True)
+            set_state(slug, "e_hash", sum_hash)
             set_state(slug, "status", "seo_optimized")
             processed_count += 1
             print(f"  → Optimized: {slug}")

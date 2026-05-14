@@ -118,6 +118,11 @@ def publish_one(slug: str, dry_run: bool = False) -> bool:
         logger.error("Failed to publish to Telegram for %s: %s", slug, e)
         return False
 
+def _compute_hash(path: Path) -> str:
+    import hashlib
+    return hashlib.sha256(path.read_bytes()).hexdigest()[:16]
+
+
 def main(argv=None) -> int:
     parser = argparse.ArgumentParser(description="Pipeline G: Telegram Publisher")
     parser.add_argument("--slug", help="Process only this slug")
@@ -125,11 +130,10 @@ def main(argv=None) -> int:
     parser.add_argument("--force", action="store_true", help="Reprocess even if already published")
     args = parser.parse_args(argv)
 
+    settings = get_settings()
     if args.slug:
         slugs = [args.slug]
     else:
-        # Find all summaries
-        settings = get_settings()
         if not settings.summaries_dir.exists():
             print(f"Summaries dir does not exist: {settings.summaries_dir}")
             return 1
@@ -137,13 +141,16 @@ def main(argv=None) -> int:
 
     processed_count = 0
     for slug in slugs:
+        summary_path = settings.summaries_dir / f"{slug}.md"
+        sum_hash = _compute_hash(summary_path) if summary_path.exists() else None
         state = get_state(slug)
-        if not args.force and state.get("published_telegram"):
+        if not args.force and state.get("g_hash") == sum_hash and state.get("published_telegram"):
             continue
 
         if publish_one(slug, dry_run=args.dry_run):
             processed_count += 1
             if not args.dry_run:
+                set_state(slug, "g_hash", sum_hash)
                 print(f"  → Published: {slug}")
             else:
                 print(f"  → Previewed: {slug}")

@@ -81,6 +81,12 @@ class ArticleState(BaseModel):
     quality: str | None = None
     quality_checked: bool = False
     qc_hash: str | None = None
+    a_hash: str | None = None
+    b_hash: str | None = None
+    c_hash: str | None = None
+    d_hash: str | None = None
+    e_hash: str | None = None
+    g_hash: str | None = None
     status: str = "draft"
     revision_count: int = 0
     last_edited_at: str | None = None
