@@ -212,6 +212,10 @@ def summarize_one(slug: str, logger: Logger | None = None) -> Path:
     return out
 
 
+def _compute_hash(path: Path) -> str:
+    return hashlib.sha256(path.read_bytes()).hexdigest()[:16]
+
+
 def _summarize_slug(slug: str, force: bool, logger: Logger | None = None) -> str | None:
     from guides.state import get_state, set_state
     settings = get_settings()
@@ -264,7 +268,7 @@ def main(argv=None) -> int:
                     print(f"  → {out}")
                     processed += 1
             except Exception:
-                logger.exception("Failed to summarize %s", slug)
+                log.exception("Failed to summarize %s", slug)
 
     print(f"Processed {processed} summaries")
     return 0
