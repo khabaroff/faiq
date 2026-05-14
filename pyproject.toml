@@ -29,7 +29,9 @@ packages = ["src/guides"]
 
 [dependency-groups]
 dev = [
+    "mypy>=1.18.2",
     "pytest>=9.0.3",
+    "pytest-cov>=7.1.0",
     "ruff>=0.6",
 ]
 
@@ -40,3 +42,23 @@ target-version = "py313"
 [tool.ruff.lint]
 select = ["E", "F", "W", "I", "UP", "B", "RUF"]
 ignore = ["E501", "UP007", "B008", "RUF001"]
+
+[tool.mypy]
+strict_optional = true
+warn_unused_ignores = true
+check_untyped_defs = true
+ignore_missing_imports = true
+ignore_errors = false
+
+[[tool.mypy.overrides]]
+module = ["guides.*"]
+ignore_errors = true
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "--strict-markers"
+markers = [
+    "slow: slow tests",
+    "integration: needs external services",
+    "unit: pure unit tests",
+]
