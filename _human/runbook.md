@@ -75,3 +75,27 @@ gitleaks detect --source . --no-git
 ```
 
 If gitleaks finds a secret in CI, the build fails. Rotate the exposed secret immediately.
+
+## Operational Procedures
+
+### Parallel Workers Configuration
+As of Sprint 3, parallel processing is enabled for PDF OCR and certain fetchers.
+- **Max workers:** Recommended `CPU_COUNT * 2` or restricted by LLM Tier limits (TPM).
+- **Safety:** `state.py` uses `busy_timeout=5.0` and `threading-local` connections, making it thread-safe for parallel writes.
+
+### Database Recovery: "database is locked"
+If SQLite remains locked due to a crashed process:
+1. Identify holding process: `fuser state/articles.db`
+2. Kill the process: `kill -9 <PID>`
+3. Remove WAL files if persistent: `rm state/articles.db-wal state/articles.db-shm` (Warning: may lose last transaction)
+4. Verify integrity: `sqlite3 state/articles.db "PRAGMA integrity_check;"`
+
+### Reading Cost Reports
+Cost reports are generated as JSONL in `logs/cost_report.jsonl`.
+- **Tool:** Use `python -m guides.tools.cost_report --summarize` to see daily/monthly totals.
+- **Filtering:** Use `jq` for custom queries on JSONL logs.
+
+### Backup & Restore
+1. **Backup:** `cp state/articles.db state/articles.db.bak`
+2. **Restore:** `mv state/articles.db.bak state/articles.db`
+3. **Wiki Backup:** Wiki pages are backed up in `wiki/.backups/` (10 versions kept).
