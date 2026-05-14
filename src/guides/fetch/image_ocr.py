@@ -9,9 +9,12 @@ import mimetypes
 import re
 import sqlite3
 import sys
+import tempfile
+import threading
 import time
 import urllib.parse
 from collections.abc import Callable
+from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 from typing import Literal
 
@@ -23,6 +26,7 @@ from guides.security.url_safety import validate_url
 from guides.settings import get_settings
 
 settings = get_settings()
+REPO_ROOT = Path(__file__).resolve().parents[3]
 ASSETS_DIR = settings.sources_dir / "_assets"
 CACHE_DB_PATH = settings.state_dir / "ocr_cache.sqlite"
 RUNS_LOG_PATH = settings.logs_dir / "ocr_runs.jsonl"
@@ -33,6 +37,8 @@ OCR_MARKER = "> **Image OCR (auto):**"
 DEFAULT_TIMEOUT_SECONDS = 30
 MAX_RETRIES = 3
 OCR_MAX_COMPLETION_TOKENS = 4096
+MAX_OCR_IMAGE_SIZE = (2048, 2048)
+OCR_PARALLELISM = 4
 
 REMOTE_IMAGE_SCHEME_RE = re.compile(r"^https?://", re.IGNORECASE)
 MARKDOWN_IMAGE_RE = re.compile(r"!\[[^\]]*\]\((?P<url><[^>]+>|[^)\s]+)", re.IGNORECASE)
@@ -185,6 +191,34 @@ def fetch_and_cache_remote_image(url: str) -> tuple[str, Path, bytes, str]:
     return sha256, asset_path, data, content_type
 
 
+_TEMP_OCR_DIR = Path(tempfile.gettempdir()) / "guides-ocr"
+_TEMP_OCR_DIR.mkdir(parents=True, exist_ok=True)
+_TEMP_OCR_LOCK = threading.Lock()
+
+
+def _prepare_image_for_ocr(image_bytes: bytes, content_type: str, asset_path: Path) -> Path:
+    try:
+        from PIL import Image
+    except Exception:
+        return asset_path
+
+    try:
+        with Image.open(asset_path) as img:
+            if img.width <= MAX_OCR_IMAGE_SIZE[0] and img.height <= MAX_OCR_IMAGE_SIZE[1]:
+                return asset_path
+
+            resized = img.copy()
+            resized.thumbnail(MAX_OCR_IMAGE_SIZE)
+            suffix = asset_path.suffix or ".png"
+            prepared = _TEMP_OCR_DIR / f"{asset_path.stem}.ocr{suffix}"
+            image_format = img.format or ("PNG" if suffix.lower() == ".png" else None)
+            with _TEMP_OCR_LOCK:
+                resized.save(prepared, format=image_format)
+            return prepared
+    except Exception:
+        return asset_path
+
+
 def _cache_db() -> sqlite3.Connection:
     _ensure_dirs()
     conn = sqlite3.connect(str(CACHE_DB_PATH))
@@ -275,7 +309,7 @@ def run_vision_ocr(
     # We use asset_path if provided, otherwise we might need to save image_bytes to a temp file
     # for call_smart_with_images which expects Path.
     if asset_path and asset_path.exists():
-        path_to_use = asset_path
+        path_to_use = _prepare_image_for_ocr(image_bytes, content_type, asset_path)
     else:
         # Fallback: create a temporary file if asset_path is not available
         temp_dir = Path("data/tmp")
@@ -347,7 +381,6 @@ def process_markdown_file(
     text = path.read_text(encoding="utf-8")
     newline = "\r\n" if "\r\n" in text else "\n"
     lines = text.splitlines()
-    output: list[str] = []
 
     remote_urls_seen = 0
     inserted_blocks = 0
@@ -356,25 +389,32 @@ def process_markdown_file(
 
     conn = _cache_db()
     try:
+        line_records: list[dict] = []
+        pending_jobs: list[dict] = []
         idx = 0
         while idx < len(lines):
             line = lines[idx]
             refs = extract_remote_image_urls(line)
             if not refs:
-                output.append(line)
+                line_records.append({"line": line, "ocr_blocks": [], "passthrough": False})
                 idx += 1
                 continue
 
             existing_end = _skip_existing_ocr_block(lines, idx)
             if existing_end is not None:
-                output.append(line)
-                output.extend(lines[idx + 1 : existing_end])
+                line_records.append(
+                    {
+                        "line": line,
+                        "ocr_blocks": lines[idx + 1 : existing_end],
+                        "passthrough": True,
+                    }
+                )
                 idx = existing_end
                 remote_urls_seen += len(refs)
                 continue
 
             rewritten_line = line
-            pending_ocr: list[str] = []
+            record: dict = {"line": rewritten_line, "ocr_blocks": [], "passthrough": False}
             for url in refs:
                 remote_urls_seen += 1
                 try:
@@ -386,17 +426,51 @@ def process_markdown_file(
                     rewritten_line = rewritten_line.replace(url, str(rel))
                 except ValueError:
                     pass
+                record["line"] = rewritten_line
                 cached = _load_cached_ocr(conn, sha256, prompt_version, model)
                 if cached is None:
-                    result, tokens_in, tokens_out, cost_usd = vlm_runner(
-                        image_bytes,
-                        content_type=content_type,
-                        model=model,
-                        asset_path=asset_path,
+                    pending_jobs.append(
+                        {
+                            "record": record,
+                            "url": url,
+                            "sha256": sha256,
+                            "asset_path": asset_path,
+                            "image_bytes": image_bytes,
+                            "content_type": content_type,
+                        }
                     )
+                else:
+                    cache_hits += 1
+                    record["ocr_blocks"].extend(_render_ocr_block(cached))
+                    inserted_blocks += 1
+
+            if rewritten_line != line:
+                changed = True
+            if record["ocr_blocks"]:
+                changed = True
+            line_records.append(record)
+
+            idx += 1
+
+        if pending_jobs:
+            max_workers = min(OCR_PARALLELISM, len(pending_jobs))
+            with ThreadPoolExecutor(max_workers=max_workers) as pool:
+                futures = [
+                    pool.submit(
+                        vlm_runner,
+                        job["image_bytes"],
+                        content_type=job["content_type"],
+                        model=model,
+                        asset_path=job["asset_path"],
+                    )
+                    for job in pending_jobs
+                ]
+
+                for job, future in zip(pending_jobs, futures):
+                    result, tokens_in, tokens_out, cost_usd = future.result()
                     _store_cached_ocr(
                         conn,
-                        sha256=sha256,
+                        sha256=job["sha256"],
                         prompt_version=prompt_version,
                         model=model,
                         result=result,
@@ -407,9 +481,9 @@ def process_markdown_file(
                     _append_run_log(
                         {
                             "file": _to_repo_relative(path),
-                            "image_url": url,
-                            "asset_path": _to_repo_relative(asset_path),
-                            "sha256": sha256,
+                            "image_url": job["url"],
+                            "asset_path": _to_repo_relative(job["asset_path"]),
+                            "sha256": job["sha256"],
                             "model": model,
                             "prompt_version": prompt_version,
                             "tokens_in": tokens_in,
@@ -419,23 +493,16 @@ def process_markdown_file(
                             "status": "ok",
                         }
                     )
-                else:
-                    result = cached
-                    cache_hits += 1
-
-                pending_ocr.extend(_render_ocr_block(result))
-                inserted_blocks += 1
-
-            if rewritten_line != line:
-                changed = True
-            output.append(rewritten_line)
-            if pending_ocr:
-                output.extend(pending_ocr)
-                changed = True
-
-            idx += 1
+                    job["record"]["ocr_blocks"].extend(_render_ocr_block(result))
+                    inserted_blocks += 1
+                    changed = True
     finally:
         conn.close()
+
+    output: list[str] = []
+    for record in line_records:
+        output.append(record["line"])
+        output.extend(record["ocr_blocks"])
 
     new_text = newline.join(output)
     if text.endswith(("\n", "\r")) and not new_text.endswith(newline):

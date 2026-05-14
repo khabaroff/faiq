@@ -1,7 +1,9 @@
 """Tests for image_ocr.process_markdown_file via injectable fetcher/vlm_runner."""
 from __future__ import annotations
 
+import time
 from pathlib import Path
+from urllib.parse import urlparse
 
 import httpx
 import pytest
@@ -11,6 +13,7 @@ from guides.fetch.image_ocr import (
     NonImageContentError,
     process_markdown_file,
     _download_url,
+    _prepare_image_for_ocr,
 )
 
 _FAKE_SHA = "a" * 64
@@ -125,6 +128,52 @@ def test_multiple_images_in_one_file(tmp_path):
     assert stats["changed"]
 
 
+def test_parallel_ocr_keeps_output_order_and_reduces_wall_time(tmp_path):
+    sha_a = "c" * 64
+    sha_b = "d" * 64
+    asset_a = tmp_path / (sha_a + ".png")
+    asset_b = tmp_path / (sha_b + ".png")
+    asset_a.write_bytes(_FAKE_BYTES)
+    asset_b.write_bytes(_FAKE_BYTES)
+    md = tmp_path / "article.md"
+    md.write_text(
+        "![a](https://example.com/a.png)\n"
+        "![b](https://example.com/b.png)\n"
+    )
+
+    def fetcher(url: str):
+        if url.endswith("/a.png"):
+            return sha_a, asset_a, _FAKE_BYTES, _FAKE_CONTENT_TYPE
+        return sha_b, asset_b, _FAKE_BYTES, _FAKE_CONTENT_TYPE
+
+    def vlm_runner(image_bytes, *, content_type, model, asset_path):
+        time.sleep(0.2)
+        name = asset_path.stem[0].upper()
+        return OCRResult(
+            image_type="diagram",
+            visible_text=f"Text {name}",
+            description=f"Desc {name}",
+        ), 10, 5, 0.0001
+
+    start = time.perf_counter()
+    stats = process_markdown_file(md, fetcher=fetcher, vlm_runner=vlm_runner)
+    elapsed = time.perf_counter() - start
+
+    content = md.read_text()
+    assert stats["inserted_blocks"] == 2
+    assert "Text C" in content
+    assert "Text D" in content
+    assert content.index("Text C") < content.index("Text D")
+    assert elapsed < 0.35
+
+
+def test_prepare_image_for_ocr_without_pillow_returns_original_asset(tmp_path):
+    asset = tmp_path / "img.png"
+    asset.write_bytes(_FAKE_BYTES)
+    prepared = _prepare_image_for_ocr(_FAKE_BYTES, "image/png", asset)
+    assert prepared == asset
+
+
 from unittest.mock import patch, MagicMock
 
 def test_redirect_to_metadata_blocked():
@@ -137,7 +186,13 @@ def test_redirect_to_metadata_blocked():
     mock_resp.status_code = 301
     mock_resp.headers = {"location": metadata_url}
     
-    with patch("httpx.Client.get", return_value=mock_resp):
+    def fake_validate_url(url: str) -> str:
+        host = (urlparse(url).hostname or "").lower()
+        if host == "169.254.169.254":
+            raise ValueError(f"Host blocked: {host!r}")
+        return url
+
+    with patch("guides.fetch.image_ocr.validate_url", side_effect=fake_validate_url), patch("httpx.Client.get", return_value=mock_resp):
         with pytest.raises(ValueError, match="Host blocked"):
             _download_url(target_url)
 
