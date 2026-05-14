@@ -42,28 +42,13 @@ class PipelineBTests(unittest.TestCase):
     def test_render_summary_prompt(self, mock_load):
         self.assertEqual(b._render_summary_prompt("text", "u", "t", "ru"), "text")
 
-    @patch("guides.pipelines.b_summarize.call_llm")
+    @patch("guides.pipelines.b_summarize.call_llm_messages")
     @patch("guides.pipelines.b_summarize.get_smart_client")
     def test_call_llm_summary(self, mock_client, mock_call):
         mock_call.return_value = ("---\ntools: []\npatterns: []\n---\nBody", Mock(prompt_tokens=1, completion_tokens=1, cost_usd=0))
         self.assertIn("Body", b.call_llm_summary("s", "src", "u", "t", "ru"))
 
-    @patch("guides.pipelines.b_summarize.call_llm_summary", return_value="---\ntools: []\npatterns: []\n---\nBody")
-    def test_summarize_one(self, mock_call):
-        from tempfile import TemporaryDirectory
-        with TemporaryDirectory() as tmpdir:
-            tp = Path(tmpdir)
-            src_dir = tp / "sources"
-            src_dir.mkdir()
-            sum_dir = tp / "summaries"
-            sum_dir.mkdir()
-            with patch("guides.pipelines.b_summarize.SOURCES_DIR", src_dir), \
-                 patch("guides.pipelines.b_summarize.SUMMARIES_DIR", sum_dir):
-                (src_dir / "s.md").write_text("---\ntitle: T\n---\nBody")
-                out = b.summarize_one("s")
-                self.assertTrue(out.exists())
-
-    @patch("guides.pipelines.b_summarize.call_llm")
+    @patch("guides.pipelines.b_summarize.call_llm_messages")
     @patch("guides.pipelines.b_summarize.get_smart_client")
     def test_call_llm_summary_retry(self, mock_client, mock_call):
         mock_call.side_effect = [
@@ -276,10 +261,38 @@ class PipelineDTests(unittest.TestCase):
     @patch("guides.pipelines.d_quality_check.QC_REPORT")
     @patch("guides.pipelines.d_quality_check.SUMMARIES_DIR")
     def test_main(self, mock_sum_dir, mock_report, mock_fm, mock_state, mock_clean, mock_check):
-        mock_report.parent.mkdir.return_value = None
-        mock_sum_dir.__truediv__.side_effect = lambda x: Path(f"/tmp/{x}")
-        with patch.object(Path, "exists", return_value=True):
-            self.assertEqual(d.main(["--mode", "summary"]), 0)
+        from tempfile import TemporaryDirectory
+        with TemporaryDirectory() as tmpdir:
+            tp = Path(tmpdir)
+            report_file = tp / "report.json"
+            mock_report.__str__.return_value = str(report_file)
+            mock_report.parent = report_file.parent
+            
+            mock_sum_dir.__truediv__.side_effect = lambda x: tp / x
+            with patch.object(Path, "exists", return_value=True):
+                self.assertEqual(d.main(["--mode", "summary"]), 0)
+                self.assertTrue(report_file.exists())
+
+    @patch("guides.pipelines.b_summarize.call_llm_messages")
+    @patch("guides.pipelines.b_summarize.get_smart_client")
+    def test_call_llm_summary_uses_conversation_history(self, mock_client, mock_call):
+        """Retry should append assistant + correction, not resend full body."""
+        mock_call.side_effect = [
+            ("Bad", Mock(prompt_tokens=100, completion_tokens=50, cost_usd=0.001)),
+            ("---\ntools: []\npatterns: []\n---\nGood", Mock(prompt_tokens=120, completion_tokens=50, cost_usd=0.001))
+        ]
+        res = b.call_llm_summary("s", "src", "u", "t", "ru")
+        self.assertIn("Good", res)
+        self.assertEqual(mock_call.call_count, 2)
+        # messages list is mutated in place; final state after two calls
+        final_messages = mock_call.call_args_list[1][0][2]
+        self.assertEqual(len(final_messages), 4)
+        self.assertEqual(final_messages[0]["role"], "system")
+        self.assertEqual(final_messages[1]["role"], "user")
+        self.assertEqual(final_messages[2]["role"], "assistant")
+        self.assertEqual(final_messages[3]["role"], "user")
+        self.assertIn("ВАЖНО", final_messages[3]["content"])
+
 
 if __name__ == "__main__":
     unittest.main()

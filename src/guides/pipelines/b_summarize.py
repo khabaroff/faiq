@@ -31,7 +31,7 @@ import yaml
 
 from guides.atomic_write import atomic_write_text
 from guides.frontmatter import parse_frontmatter
-from guides.llm import call_llm, count_tokens, get_smart_client, load_prompt
+from guides.llm import call_llm_messages, count_tokens, get_smart_client, load_prompt
 from guides.settings import Settings
 from guides.tools.daily_log import append_log_entry
 
@@ -112,31 +112,52 @@ def call_llm_summary(slug: str, source_text: str, source_url: str, source_type: 
     )
 
     client = get_smart_client()
+    messages: list[dict] = []
+    if system:
+        messages.append({"role": "system", "content": system})
+    messages.append({"role": "user", "content": base_prompt})
+
+    total_cost = 0.0
     last_response = ""
     last_usage = None
     for attempt in range(MAX_RETRIES):
-        if attempt == 0:
-            prompt = base_prompt
-        else:
-            prompt = base_prompt + f"\n\n---\n\n**ВАЖНО (попытка {attempt + 1}):** {_CORRECTION}"
-
-        last_response, last_usage = call_llm(client, deployment, prompt, system)
+        last_response, last_usage = call_llm_messages(client, deployment, messages)
+        total_cost += last_usage.cost_usd
 
         if _validate_summary_md(last_response):
-            if last_usage:
-                append_log_entry(
-                    slug=slug,
-                    action="summary",
-                    model=deployment,
-                    tokens_in=last_usage.prompt_tokens,
-                    tokens_out=last_usage.completion_tokens,
-                    cost_usd=last_usage.cost_usd,
-                )
+            append_log_entry(
+                slug=slug,
+                action="summary",
+                model=deployment,
+                tokens_in=last_usage.prompt_tokens,
+                tokens_out=last_usage.completion_tokens,
+                cost_usd=total_cost,
+            )
             return last_response
 
         logger.warning("attempt %d/%d: bad frontmatter format for %s", attempt + 1, MAX_RETRIES, slug)
+        append_log_entry(
+            slug=slug,
+            action=f"summary_retry_{attempt + 1}",
+            model=deployment,
+            tokens_in=last_usage.prompt_tokens,
+            tokens_out=last_usage.completion_tokens,
+            cost_usd=last_usage.cost_usd,
+        )
+
+        # Persist conversation for next attempt (prompt-cache friendly)
+        messages.append({"role": "assistant", "content": last_response})
+        messages.append({"role": "user", "content": f"**ВАЖНО (попытка {attempt + 2}):** {_CORRECTION}"})
 
     logger.error("all %d attempts failed for %s, marking needs_review", MAX_RETRIES, slug)
+    append_log_entry(
+        slug=slug,
+        action="summary_needs_review",
+        model=deployment,
+        tokens_in=last_usage.prompt_tokens,
+        tokens_out=last_usage.completion_tokens,
+        cost_usd=total_cost,
+    )
     return f"---\ntools: []\npatterns: []\nquality: needs_review\n---\n\n{last_response}"
 
 

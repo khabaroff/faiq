@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 from collections import defaultdict
 from dataclasses import dataclass
 from datetime import datetime, timedelta
@@ -92,6 +93,30 @@ def _aggregate(entries: list[dict]) -> tuple[dict[str, Totals], dict[str, Totals
     return by_model, by_date, grand
 
 
+def _send_budget_alert(day: str, actual: float, budget: float) -> None:
+    try:
+        from guides.pipelines.g_telegram import send_telegram_message
+
+        msg = (
+            f"Cost alert: daily spend {_format_usd(actual)} on {day} "
+            f"exceeds budget {_format_usd(budget)}"
+        )
+        send_telegram_message(msg)
+    except Exception as e:
+        print(f"Failed to send Telegram alert: {e}")
+
+
+def _check_budget(by_date: dict[str, Totals]) -> None:
+    budget = float(os.environ.get("BUDGET_DAILY_USD", "5.0"))
+    today = datetime.now().strftime("%Y-%m-%d")
+    today_total = by_date.get(today, Totals())
+    if today_total.cost_usd > budget:
+        print(f"WARNING: Daily budget exceeded: {_format_usd(today_total.cost_usd)} > {_format_usd(budget)}")
+        _send_budget_alert(today, today_total.cost_usd, budget)
+    else:
+        print(f"Daily budget OK: {_format_usd(today_total.cost_usd)} / {_format_usd(budget)}")
+
+
 def _print_section(title: str, rows: list[tuple[str, Totals]]) -> None:
     print(title)
     for key, totals in rows:
@@ -118,6 +143,7 @@ def main() -> int:
     _print_section("By Date:", sorted(by_date.items()))
     print()
     print(f"TOTAL: {grand.calls} calls, {grand.tokens} tokens, {_format_usd(grand.cost_usd)}")
+    _check_budget(by_date)
     return 0
 
 
