@@ -35,10 +35,10 @@ class YouTubeRemTests(unittest.IsolatedAsyncioTestCase):
         mock_exec.return_value = mock_proc
 
         item = QueueItem(source="https://youtube.com/watch?v=403", source_kind=SourceKind.URL, received_at=datetime.now())
-        
+
         with patch("guides.fetch.youtube.cache_failure") as mock_cache_fail:
             res = await fetch_youtube(item)
-            mock_cache_fail.assert_called_once_with(item.source, 403)
+            mock_cache_fail.assert_called_once_with("youtube:403", 403)
             self.assertEqual(res.raw_text, "")
             self.assertEqual(res.source_meta["error"], "no_transcript")
             mock_exec.assert_called_once()
@@ -48,7 +48,8 @@ class YouTubeRemTests(unittest.IsolatedAsyncioTestCase):
     @patch("guides.fetch.youtube._try_transcribe_service", return_value=None)
     async def test_youtube_timeout_logic(self, mock_transcribe, mock_exec, mock_validate):
         mock_proc = AsyncMock()
-        mock_proc.communicate.side_effect = asyncio.TimeoutError
+        mock_proc.communicate = Mock(return_value=object())
+        mock_proc.kill = Mock()
         mock_proc.returncode = None
         mock_exec.return_value = mock_proc
 
