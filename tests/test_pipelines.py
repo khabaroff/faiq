@@ -8,6 +8,7 @@ import guides.pipelines.c_wiki_update as c
 import guides.pipelines.e_seo as e
 import guides.pipelines.g_telegram as g
 import guides.pipelines.d_quality_check as d
+from guides.slugify import canonicalize_slug
 
 class PipelineBTests(unittest.TestCase):
     def test_count_tokens(self):
@@ -50,6 +51,14 @@ class PipelineBTests(unittest.TestCase):
 
     @patch("guides.pipelines.b_summarize.call_llm_messages")
     @patch("guides.pipelines.b_summarize.get_smart_client")
+    def test_call_llm_summary_uses_injected_logger(self, mock_client, mock_call):
+        mock_call.return_value = ("---\ntools: []\npatterns: []\n---\nBody", Mock(prompt_tokens=1, completion_tokens=1, cost_usd=0.5))
+        cost_logger = Mock()
+        b.call_llm_summary("s", "src", "u", "t", "ru", logger=cost_logger)
+        cost_logger.log_cost.assert_called_once()
+
+    @patch("guides.pipelines.b_summarize.call_llm_messages")
+    @patch("guides.pipelines.b_summarize.get_smart_client")
     def test_call_llm_summary_retry(self, mock_client, mock_call):
         mock_call.side_effect = [
             ("Bad Response", Mock(prompt_tokens=1, completion_tokens=1, cost_usd=0)),
@@ -64,8 +73,8 @@ class PipelineCTests(unittest.TestCase):
         self.assertEqual(c.slugify("Hello World"), "hello-world")
 
     def test_canonicalize_slug(self):
-        self.assertEqual(c.canonicalize_slug("Claude Code", ["claude-code"]), "claude-code")
-        self.assertEqual(c.canonicalize_slug("New", []), "new")
+        self.assertEqual(canonicalize_slug("Claude Code", ["claude-code"]), "claude-code")
+        self.assertEqual(canonicalize_slug("New", []), "new")
 
     def test_extract_summary_fm(self):
         text = "---\ntools: [T1]\npatterns: [P1]\nsource_url: u\n---\nBody"
@@ -97,6 +106,16 @@ class PipelineCTests(unittest.TestCase):
             c.write_wiki_page(Path(tmp.name), "N", "s", "t", "u", "D", [{"source_slug": "s1"}])
             self.assertIn("# N", Path(tmp.name).read_text())
 
+    @patch("guides.pipelines.c_wiki_update.call_llm")
+    @patch("guides.pipelines.c_wiki_update.get_smart_client")
+    @patch("guides.pipelines.c_wiki_update.load_prompt", return_value="{{current_page_md}}")
+    def test_call_llm_update_uses_injected_logger(self, mock_prompt, mock_client, mock_call):
+        mock_call.return_value = ('{"action":"create","page_md":"---\\nname: T\\n---\\n# T"}', Mock(prompt_tokens=1, completion_tokens=2, cost_usd=0.25))
+        cost_logger = Mock()
+        result = c.call_llm_update("s", "", "Tool", "tool", {"source_slug": "s"}, logger=cost_logger)
+        self.assertEqual(result["action"], "create")
+        cost_logger.log_cost.assert_called_once()
+
     @patch("guides.pipelines.c_wiki_update.call_llm_update")
     @patch("guides.pipelines.c_wiki_update.get_settings")
     def test_propagate_summary_rewrite_description(self, mock_settings, mock_call):
@@ -121,8 +140,8 @@ class PipelineCTests(unittest.TestCase):
 
     def test_canonicalize_slug_fuzzy(self):
         # 85+ score token_sort_ratio
-        self.assertEqual(c.canonicalize_slug("Claude 3.5 Sonnet", ["claude-35-sonnet"]), "claude-35-sonnet")
-        self.assertEqual(c.canonicalize_slug("Brand New Tool", ["other"]), "brand-new-tool")
+        self.assertEqual(canonicalize_slug("Claude 3.5 Sonnet", ["claude-35-sonnet"]), "claude-35-sonnet")
+        self.assertEqual(canonicalize_slug("Brand New Tool", ["other"]), "brand-new-tool")
 
     def test_extract_summary_fm_edge_cases(self):
         self.assertEqual(c.extract_summary_fm("no fm"), ([], [], ""))

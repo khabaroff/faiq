@@ -29,6 +29,27 @@ data/inbox/ → Pipeline A → public/sources/*.md
 
 Состояние: `state/articles.db` — SQLite, таблица `articles`.
 
+### Таблица `articles` (SQLite Schema)
+
+| Колонка | Тип | Описание |
+|---|---|---|
+| `slug` | TEXT | PRIMARY KEY. Human-readable ID (slug). |
+| `raw` | INTEGER | 0/1. Обработан ли фетчером (Pipeline A). |
+| `content_hash` | TEXT | SHA256 исходного контента. |
+| `summarized_at` | TEXT | Дата саммаризации (Pipeline B). |
+| `wiki_propagated` | INTEGER | 0/1. Обновлена ли wiki (Pipeline C). |
+| `wiki_propagated_at` | TEXT | Дата обновления wiki. |
+| `seo_optimized` | INTEGER | 0/1. Проведен ли SEO-анализ (Pipeline E). |
+| `published_telegram` | TEXT | Дата публикации в TG канал (Pipeline G). |
+| `quality` | TEXT | Вердикт QualityBot (Pipeline D). |
+| `quality_checked` | INTEGER | 0/1. Пройден ли контроль качества. |
+| `qc_hash` | TEXT | Хэш контента при последнем QC. |
+| `status` | TEXT | Статус ворклоу (\`draft\`, \`verified\`, \`quality_ok\`, и т.д.). |
+| `revision_count` | INTEGER | Количество итераций обработки. |
+| `last_edited_at` | TEXT | ISO timestamp последнего изменения. |
+| `last_edited_by` | TEXT | Кто изменил (user/bot). |
+| `compacted` | INTEGER | 0/1. Признак агрегации в лонгрид. |
+
 ### Формат public/sources/*.md
 
 ```yaml

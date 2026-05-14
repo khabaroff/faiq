@@ -1,6 +1,6 @@
 """Pipeline A — Ingest+Format.
 
-Input: URL, local file (.md, .pdf), or GitHub repo URL from inbox/.
+Input: URL, local file (.md, .pdf), or GitHub repo URL from data/inbox/.
 Output: public/sources/<slug>.md with YAML frontmatter.
 
 Workflow:
@@ -8,7 +8,7 @@ Workflow:
   2. Fetch content (clean MD, metadata).
   3. OCR remote images (if article).
   4. Save as public/sources/<slug>.md.
-  5. Move inbox file to inbox/done/.
+  5. Move inbox file to data/inbox/done/.
   6. Update state DB.
 """
 from __future__ import annotations

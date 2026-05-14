@@ -1,4 +1,4 @@
-from guides.pipelines.c_wiki_update import canonicalize_slug
+from guides.slugify import canonicalize_slug
 
 
 def test_exact_match_returns_existing():

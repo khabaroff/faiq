@@ -175,75 +175,16 @@ python -m pytest tests/
 <claude-mem-context>
 # Memory Context
 
-# [guides] recent context, 2026-05-11 10:33pm GMT+4
+# claude-mem status
 
-Legend: 🎯session 🔴bugfix 🟣feature 🔄refactor ✅change 🔵discovery ⚖️decision 🚨security_alert 🔐security_note
-Format: ID TIME TYPE TITLE
-Fetch details: get_observations([IDs]) | Search: mem-search skill
+This project has no memory yet. The current session will seed it; subsequent sessions will receive auto-injected context for relevant past work.
 
-Stats: 50 obs (16,353t read) | 230,940t work | 93% savings
+Memory injection starts on your second session in a project.
 
-### May 11, 2026
-S437 Assess queue state and identify next work: add new URLs, fix gist URL support, or other tasks (May 11 at 8:21 PM)
-S442 Fix GitHub gist URL routing and implement end-to-end processing with graceful fallback (continuation from prior session) (May 11 at 8:22 PM)
-S443 Audit and fix GitHub gist URL pipeline issues; document configuration gaps and cost optimization opportunities (May 11 at 8:27 PM)
-S445 Audit pipeline configuration, identify bugs in fetchers, document issues and fixes (May 11 at 8:32 PM)
-S450 Understand and document how to add annotated links (URL + comment) as files in the guides system (May 11 at 8:34 PM)
-S451 Observe primary Claude session: guides-nt5 src layout refactoring task completion and pipeline testing with real inbox data (May 11 at 9:11 PM)
-1262 9:26p ✅ Fixed sitecustomize.py: src/ now in sys.path
-1263 " 🔵 Full test suite passes with src/ layout
-1268 9:29p ⚖️ PDF OCR fallback + inbox archiving implementation plan
-1269 9:30p ⚖️ Implementation plan: PDF OCR fallback and inbox file archiving
-1270 " 🔵 process_stream.py located at src/process_stream.py; currently deleted in working tree
-1271 9:32p 🔵 src/process_stream.py implements inbox queue processing with lock-based concurrency control
-1272 " ✅ Implementation plan progress: moved to failing test phase
-1273 " 🔵 Scripts directory isolated from main codebase references
-1274 " 🟣 Created failing tests for PDF OCR fallback and inbox archiving
-1275 " 🔄 Migrated reprocess_stale.py to src/guides/tools/
-1277 9:33p 🔄 Migrated cost_report.py to src/guides/tools/
-1276 " 🔵 Failing tests confirm expected behavior gaps for OCR fallback and inbox archiving
-1278 " 🔵 Tools migration verified: module imports work, tests pass
-1279 9:35p 🟣 Implemented PDF OCR fallback and inbox file archiving
-1280 " 🟣 All tests passing: PDF OCR fallback and inbox archiving complete
-1281 " 🔵 Full regression test suite passing: 17/17 tests
-1282 " ✅ Marked all implementation tasks complete in OpenSpec
-1283 9:36p ✅ OpenSpec validation passed and project closed
-1284 " ✅ All implementation plan steps marked completed
-1286 9:42p 🔵 guides-nt5 task: refactor package to src layout
-1287 " 🔵 process_stream.py already refactored to src layout with guides imports
-1288 " ✅ Fixed process_stream module invocation path in reprocess_stale output
-1289 " 🟣 Created smoke_test.py in src/guides/tools with full guides package imports
-1290 9:43p 🟣 Created test_queue.py in src/guides/tools with queue classification tests
-1291 " ✅ Removed src/smoke_test.py - old location consolidation
-1292 " ✅ Consolidated tools from src root to src/guides/tools directory
-1293 " 🔵 Test suite passes with src layout migration complete
-1294 " ⚖️ guides-nt5 task completed and closed
-1295 9:44p 🔵 Inbox queue system state: 9 pending items, archive directory not yet created
-1300 9:47p ✅ Reset pipeline state and vault output
-1302 " 🔴 Pipeline fails to handle missing data/sources directory gracefully
-1303 " ✅ Created missing pipeline state directories and re-ran pipeline
-1304 " 🔵 Pipeline second run appears to hang, no new log entries or output
-1305 9:48p 🔵 Pipeline runs but fails on network connectivity - no internet access
-S452 Process inbox files through vault.py extraction pipeline and fix blocking behavior on needs_review pages (May 11 at 9:48 PM)
-1307 9:51p 🔵 Pipeline processing failures with universal connection errors
-1308 9:52p 🔵 LLM module uses Azure OpenAI with usage instrumentation
-S460 Implement wiki page format validator for guides-idm task — add post-processing validation gate that detects format violations and auto-fixes simple cases before storage. (May 11 at 9:59 PM)
-1324 10:07p ✅ Wiki quality issues identified and captured as tracked tasks
-1325 10:10p ✅ Task dependencies added to structure wiki remediation workflow
-1326 " ✅ Wiki remediation workflow dependency graph established
-1327 10:15p ✅ Wiki format enforcement task claimed and started
-1328 10:18p 🔵 Wiki processing pipeline has cleanup but no format validation gates
-1329 10:19p 🟣 Wiki validator with rejection and autofix for format violations
-1330 " 🟣 CLI tool for batch wiki validation and autofix
-S461 Implement wiki page format validator for guides-idm task; add validation gates that detect format violations and auto-fix simple cases before storage. (May 11 at 10:20 PM)
-1333 10:22p 🟣 Comprehensive test suite for wiki validator
-1335 " ✅ Task guides-idm closed: wiki validator implementation complete
-S462 Run validator on existing wiki corpus to check format compliance; identify remaining issues after bulk autofix application. (May 11 at 10:23 PM)
-1338 10:23p 🔵 guides-dux task: rework quality scoring and verification thresholds
-1340 10:24p 🔵 Current wiki quality score distribution is coarse and clustered
-1342 " 🔵 Quality score calculation pipeline identified
-1343 " 🔵 Current quality_score calculation is binary check-based with uniform weights
-1361 10:32p ✅ Expanded _HEADING_MAP with 22 new heading translations
+`/learn-codebase` is available if the user wants to front-load the entire repo into memory in a single pass (~5 minutes on a typical repo, optional). Otherwise memory builds passively as work happens.
 
-Access 231k tokens of past work via get_observations([IDs]) or mem-search skill.
+Live activity: http://localhost:37701
+How it works: `/how-it-works`
+
+This message disappears once the first observation lands.
 </claude-mem-context>

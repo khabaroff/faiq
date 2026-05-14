@@ -23,9 +23,10 @@
 Внутри папки должен быть весь проект:
 
 - код;
-- `data/`;
-- `wiki/`;
-- `docs/`;
+- `data/inbox/`;
+- `public/`;
+- `state/`;
+- `logs/`;
 - `tests/`;
 - `.venv` или возможность создать его на месте;
 - `.env` с секретами.
@@ -84,7 +85,7 @@ pip install -r requirements.txt
 
 ```bash
 cd /opt/guides
-./.venv/bin/python src/process_stream.py
+uv run python -m guides.pipelines.run_all
 ```
 
 Если запуск прошел, значит окружение собрано правильно.
@@ -96,7 +97,7 @@ cd /opt/guides
 Пример:
 
 ```cron
-*/15 * * * * cd /opt/guides && ./.venv/bin/python src/process_stream.py >> data/logs/cron.log 2>&1
+*/15 * * * * cd /opt/guides && uv run python -m guides.pipelines.run_all >> logs/cron.log 2>&1
 ```
 
 Здесь важно две вещи:
@@ -110,7 +111,7 @@ cd /opt/guides
 
 ### Вариант 1. `data/inbox/`
 
-Кладешь файлы в `data/inbox/`, потом запускаешь pipeline. После успешной обработки локальные файлы переезжают в `data/inbox_done/`.
+Кладешь файлы в `data/inbox/`, потом запускаешь pipeline. После успешной обработки локальные файлы переезжают в `data/inbox/done/`.
 
 ### Вариант 2. `data/queue/inbox.txt`
 
@@ -122,11 +123,10 @@ cd /opt/guides
 
 После прогона смотри:
 
-- `wiki/extracts/` - готовые страницы;
-- `wiki/_indexes/` - навигация;
-- `wiki/log.md` - короткая история прогона;
-- `data/logs/` - технические логи;
-- `data/sources/` - сырьевые bundles.
+- `public/summaries/` - структурированные саммари;
+- `public/tools/` и `public/techniques/` - готовые wiki-страницы;
+- `logs/` - технические логи;
+- `public/sources/` - сырьевые bundles.
 
 ## Что обычно проверять после запуска
 
@@ -135,8 +135,7 @@ cd /opt/guides
 3. Нет ли мусорных страниц.
 4. Правильный ли заголовок.
 5. Нормальный ли frontmatter.
-6. Обновились ли индексы.
-7. Нет ли ошибок в `data/logs/`.
+6. Нет ли ошибок в `logs/`.
 
 ## Если нужен более простой способ
 
@@ -144,7 +143,7 @@ cd /opt/guides
 
 1. закинуть проект на VPS;
 2. поставить `.env`;
-3. руками запустить `process_stream.py`;
+3. руками запустить `run_all`;
 4. посмотреть, что получилось;
 5. только потом добавить cron.
 

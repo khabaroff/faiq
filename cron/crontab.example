@@ -1,1 +1,1 @@
-*/15 * * * * uv run python process_stream.py
+*/15 * * * * cd /opt/guides && uv run python -m guides.pipelines.run_all >> logs/cron.log 2>&1
