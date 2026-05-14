@@ -3,12 +3,14 @@ from __future__ import annotations
 
 from pathlib import Path
 
+import httpx
 import pytest
 
 from guides.fetch.image_ocr import (
     OCRResult,
     NonImageContentError,
     process_markdown_file,
+    _download_url,
 )
 
 _FAKE_SHA = "a" * 64
@@ -121,3 +123,25 @@ def test_multiple_images_in_one_file(tmp_path):
     assert stats["remote_urls"] == 2
     assert stats["inserted_blocks"] == 2
     assert stats["changed"]
+
+
+from unittest.mock import patch, MagicMock
+
+def test_redirect_to_metadata_blocked():
+    # Initial URL is safe, but redirects to metadata IP
+    target_url = "https://safe.com/img.png"
+    metadata_url = "http://169.254.169.254/secret.png"
+    
+    mock_resp = MagicMock(spec=httpx.Response)
+    mock_resp.is_redirect = True
+    mock_resp.status_code = 301
+    mock_resp.headers = {"location": metadata_url}
+    
+    with patch("httpx.Client.get", return_value=mock_resp):
+        with pytest.raises(ValueError, match="Host blocked"):
+            _download_url(target_url)
+
+
+def test_file_scheme_rejected():
+    with pytest.raises(ValueError, match="URL scheme blocked"):
+        _download_url("file:///etc/passwd")
